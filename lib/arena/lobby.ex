@@ -18,7 +18,6 @@ defmodule Arena.Lobby do
        code: code,
        members: [],
        leader_id: nil,
-       formation: "stack",
        status: "waiting",
        game: nil,
        inputs: %{},
@@ -157,9 +156,10 @@ defmodule Arena.Lobby do
 
       {id, monitors} ->
         members = Enum.reject(state.members, &(&1.id == id))
+        members = if state.status == "waiting", do: assign_slots(members), else: members
 
         leader =
-          if state.leader_id == id, do: random_leader(members), else: state.leader_id
+          if state.leader_id == id, do: first_leader(members), else: state.leader_id
 
         game = if state.game, do: Arena.Game.disconnect(state.game, id)
 
@@ -216,22 +216,6 @@ defmodule Arena.Lobby do
     end
   end
 
-  defp perform("slot", %{"slot" => slot}, id, %{status: "waiting"} = state)
-       when is_integer(slot) and slot in 0..3 do
-    if Enum.any?(state.members, &(&1.slot == slot and &1.id != id)) do
-      {{:error, "That position is occupied."}, state}
-    else
-      state = %{
-        state
-        | members:
-            Enum.map(state.members, fn m -> if m.id == id, do: %{m | slot: slot}, else: m end)
-      }
-
-      broadcast_lobby(state)
-      {{:ok, %{}}, state}
-    end
-  end
-
   defp perform("order", %{"order" => order}, id, %{status: "playing"} = state)
        when order in ["hold", "form_up", "aggro", "auto"] do
     if Enum.any?(state.game.players, &(&1.id == id and &1.hp > 0 and not &1.bot)) do
@@ -251,7 +235,7 @@ defmodule Arena.Lobby do
   end
 
   defp perform(event, payload, id, state)
-       when event in ["start", "reset", "transfer", "formation"] do
+       when event in ["start", "reset"] do
     if id == state.leader_id,
       do: leader_action(event, payload, state),
       else: {{:error, "Only the lobby leader can do that."}, state}
@@ -263,7 +247,7 @@ defmodule Arena.Lobby do
     seed = :rand.uniform(999_999)
 
     game =
-      Arena.Game.new(state.members, seed, state.formation, Arena.Callsigns.bot_names(state.code))
+      Arena.Game.new(state.members, seed, Arena.Callsigns.bot_names(state.code))
 
     state = %{state | game: game, status: "playing", inputs: %{}}
     broadcast_lobby(state)
@@ -273,24 +257,14 @@ defmodule Arena.Lobby do
   end
 
   defp leader_action("reset", _, %{status: status} = state) when status in ["won", "lost"] do
-    state = %{state | game: nil, status: "waiting", inputs: %{}}
-    broadcast_lobby(state)
-    {{:ok, %{}}, state}
-  end
+    state = %{
+      state
+      | game: nil,
+        status: "waiting",
+        inputs: %{},
+        members: assign_slots(state.members)
+    }
 
-  defp leader_action("transfer", %{"user_id" => id}, state) do
-    if Enum.any?(state.members, &(&1.id == id)) do
-      state = %{state | leader_id: id}
-      broadcast_lobby(state)
-      {{:ok, %{}}, state}
-    else
-      {{:error, "Select a connected teammate."}, state}
-    end
-  end
-
-  defp leader_action("formation", %{"formation" => f}, %{status: "waiting"} = state)
-       when f in ["stack", "wedge", "line"] do
-    state = %{state | formation: f}
     broadcast_lobby(state)
     {{:ok, %{}}, state}
   end
@@ -301,13 +275,16 @@ defmodule Arena.Lobby do
   defp public(state),
     do:
       state
-      |> Map.take([:code, :members, :leader_id, :formation, :status, :chat])
+      |> Map.take([:code, :members, :leader_id, :status, :chat])
       |> Map.put(:bot_names, Arena.Callsigns.bot_names(state.code))
+
+  defp assign_slots(members),
+    do: members |> Enum.with_index() |> Enum.map(fn {member, slot} -> %{member | slot: slot} end)
 
   defp game_public(%{game: nil}, _id), do: nil
   defp game_public(state, id), do: Arena.Game.public(state.game, id)
-  defp random_leader([]), do: nil
-  defp random_leader(members), do: Enum.random(members).id
+  defp first_leader([]), do: nil
+  defp first_leader([member | _]), do: member.id
   defp topic(state), do: "session:#{state.code}"
 
   defp broadcast_lobby(state),

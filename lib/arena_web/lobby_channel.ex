@@ -100,7 +100,7 @@ defmodule ArenaWeb.LobbyChannel do
   end
 
   def handle_in(event, payload, socket)
-      when event in ["chat", "start", "transfer", "slot", "formation", "order", "reset"] do
+      when event in ["chat", "start", "order", "reset"] do
     case Arena.Lobby.action(socket.assigns.lobby_pid, socket.assigns.user_id, event, payload) do
       {:ok, reply} -> {:reply, {:ok, reply}, socket}
       {:error, reason} -> {:reply, {:error, %{reason: reason}}, socket}

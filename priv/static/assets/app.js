@@ -131,6 +131,7 @@ function join(code) {
   const channel = socket.channel(`lobby:${code}`, { name, protocol: 3 });
   state.channel = channel;
   channel.on("lobby", (lobby) => {
+    const previousLeader = state.lobby?.leader_id;
     state.lobby = lobby;
     if (lobby.status === "waiting") {
       state.game = null;
@@ -141,6 +142,8 @@ function join(code) {
     }
     renderRoster();
     updateUI();
+    if (previousLeader && previousLeader !== lobby.leader_id && isLeader())
+      notify("You are now squad leader.");
   });
   channel.on("snapshot", receiveSnapshot);
   channel.on("frame", (frame) => {
@@ -267,10 +270,6 @@ $("play-again").addEventListener("click", () => action("reset"));
 $("command-strip").addEventListener("click", (event) => {
   const button = event.target.closest("[data-order]");
   if (button) action("order", { order: button.dataset.order }, () => canvas.focus({preventScroll: true}));
-});
-$("formations").addEventListener("click", (e) => {
-  const button = e.target.closest("button");
-  if (button) action("formation", { formation: button.dataset.formation });
 });
 let draftBindings, listeningFor = null;
 function syncBindingLabels() {
@@ -445,24 +444,7 @@ function renderRoster() {
           : "OPERATOR DOWN";
     info.append(name, detail);
     row.append(number, info);
-    if (!member && state.lobby && phase() === "waiting") {
-      const b = document.createElement("button");
-      b.className = "operator-action";
-      b.textContent = "USE SLOT";
-      b.title = `Move to slot ${slot + 1}`;
-      b.addEventListener("click", () => action("slot", { slot }));
-      row.append(b);
-    } else if (member && !me && isLeader() && phase() === "waiting") {
-      const b = document.createElement("button");
-      b.className = "operator-action";
-      b.textContent = "MAKE LEADER";
-      b.title = `Transfer leadership to ${member.name}`;
-      b.setAttribute("aria-label", b.title);
-      b.addEventListener("click", () =>
-        action("transfer", { user_id: member.id }),
-      );
-      row.append(b);
-    } else if (!member) {
+    if (!member) {
       const b = document.createElement("span");
       b.className = "ai-badge";
       b.textContent = "AI";
@@ -539,7 +521,6 @@ function updateUI() {
   $("session-panel").hidden = !joined;
   $("session-code").textContent = state.lobby?.code || "—";
   document.querySelector(".helper").textContent = leader ? "AI fills empty slots. You can deploy solo." : "AI fills any slots left empty.";
-  document.querySelectorAll(".operator-action").forEach(button => { button.disabled = !state.connected; });
   $("lobby-state").textContent = joined
     ? playing
       ? "ACTIVE"
@@ -601,21 +582,13 @@ function updateUI() {
       ? "Return to briefing for a new procedural facility."
       : joined
         ? leader
-          ? "Invite friends, choose a formation, then deploy. AI fills any empty slots."
-          : `${state.lobby.members.find(m => m.id === state.lobby.leader_id)?.name || "Your leader"} will deploy the squad. You can choose an empty slot in the fireteam list.`
+          ? "Invite friends or deploy now. AI fills any empty slots."
+          : `${state.lobby.members.find(m => m.id === state.lobby.leader_id)?.name || "Your leader"} will deploy the squad. Players are listed in join order.`
         : "Create an operation to assemble your team.";
   if (joined && !state.connected) {
     $("mission-status").textContent = "Connection interrupted";
     $("mission-description").textContent = "Reconnecting automatically. Controls will resume when the connection returns.";
   }
-  document.querySelectorAll("[data-formation]").forEach((button) => {
-    button.classList.toggle(
-      "selected",
-      button.dataset.formation === (state.lobby?.formation || "stack"),
-    );
-    button.setAttribute("aria-pressed", String(button.dataset.formation === (state.lobby?.formation || "stack")));
-    button.disabled = !state.connected || !leader || status !== "waiting";
-  });
   if (over) {
     $("end-label").textContent =
       status === "won" ? "OPERATION COMPLETE" : "OPERATION FAILED";

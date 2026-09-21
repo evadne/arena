@@ -495,16 +495,6 @@ input:focus {
 .operator.human .operator-detail {
   color: #749663;
 }
-.operator-action {
-  background: none;
-  border: 0;
-  font: 8px var(--mono);
-  color: #a4c080;
-  padding: 5px 0;
-}
-.operator-action:hover {
-  color: #d6ecb5;
-}
 .ai-badge {
   font: 7px var(--mono);
   color: #4e7048;
@@ -516,34 +506,6 @@ input:focus {
   justify-content: space-between;
   margin-top: 13px;
   gap: 15px;
-}
-.formation-options {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.formation-label {
-  font-size: 7px;
-  letter-spacing: 1px;
-  color: #4f694c;
-}
-.formation-options button {
-  border: 0;
-  background: none;
-  color: #5d7953;
-  font: 8px var(--mono);
-  padding: 0;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.formation-options button.selected {
-  color: #c3dba1;
-}
-.formation-icon {
-  font-size: 14px;
-  line-height: 10px;
 }
 .helper {
   color: #496044;
@@ -717,19 +679,6 @@ kbd {
   border-bottom: 2px solid #425c3555;
   padding: 0 2px;
 }
-.select-label {
-  margin: 0;
-  letter-spacing: 0;
-}
-.select-label select {
-  font: 7px var(--mono);
-  border: 0;
-  background: transparent;
-  color: #58774b;
-  cursor: pointer;
-  padding: 0;
-  appearance: none;
-}
 dialog {
   width: min(520px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
@@ -853,7 +802,7 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   justify-content: center;
   color: #92af73;
 }
-.end-screen h2 {
+.end-screen > h2 {
   font: 800 62px/0.95 var(--display);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1219,7 +1168,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .operator-detail {
     font-size: 6px;
   }
-  .operator-action,
   .ai-badge {
     margin-left: auto;
     font-size: 6px;
@@ -1229,9 +1177,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   }
   .squad-bottom {
     margin-top: 12px;
-  }
-  .formation-options {
-    gap: 19px;
   }
   .comms-panel {
     left: 7vw;
@@ -1258,9 +1203,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   }
   .field-guide .guide-objective {
     display: none;
-  }
-  .select-label select {
-    font-size: 6px;
   }
   .is-connected #session-panel {
     position: absolute;
@@ -1425,10 +1367,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .operation-active .ai-badge {
     font-size: 5px;
   }
-  .operation-active .operator-action {
-    font-size: 7px;
-    padding: 0;
-  }
   .operation-active .deployment-bar {
     bottom: 107px;
     left: 50%;
@@ -1446,7 +1384,7 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
     width: 87vw;
     padding: 29px 22px;
   }
-  .end-screen h2 {
+  .end-screen > h2 {
     font-size: 45px;
   }
   .end-screen .briefing-tag {
@@ -1650,7 +1588,7 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   }
 }
 
-/* Staging follows document flow: members, formation, deploy, then chat. */
+/* Staging follows document flow: members, deploy, then chat. */
 body.is-connected:not(.operation-active) { overflow: auto; }
 body.is-connected:not(.operation-active) .game-shell { height: auto; min-height: 100dvh; }
 body:not(.operation-active) .canvas-wrap { position: fixed; }
@@ -1691,20 +1629,10 @@ body:not(.operation-active) .lobby-layout .operator-info { flex: 1; width: auto;
 body:not(.operation-active) .lobby-layout .operator-number { font-size: 24px; line-height: 26px; }
 body:not(.operation-active) .lobby-layout .operator-name { font-size: 12px; max-width: none; }
 body:not(.operation-active) .lobby-layout .operator-detail { font-size: 9px; color: #9eb48c; }
-body:not(.operation-active) .lobby-layout .operator-action {
-  font-size: 9px;
-  border: 1px solid #6f8e5f70;
-  padding: 9px;
-  flex: none;
-  margin: 0;
-}
 body:not(.operation-active) .lobby-layout .ai-badge { font-size: 9px; }
 body:not(.operation-active) .lobby-layout .squad-heading h2 { font-size: 11px; }
 body:not(.operation-active) .lobby-layout .squad-heading h2 span { font-size: 9px; margin-left: 10px; color: #9eb48c; }
 body:not(.operation-active) .lobby-layout .squad-bottom { display: block; margin: 18px 0 0; }
-body:not(.operation-active) .lobby-layout .formation-options { gap: 18px; flex-wrap: wrap; }
-body:not(.operation-active) .lobby-layout .formation-options button { font-size: 10px; padding: 4px 0; }
-body:not(.operation-active) .lobby-layout .formation-label { font-size: 8px; color: #91ab7c; }
 body:not(.operation-active) .lobby-layout .helper { display: block; font-size: 10px; color: #91ab7c; margin-top: 10px; }
 body:not(.operation-active) .lobby-layout .deployment-bar { display: block; margin-top: 24px; }
 body:not(.operation-active) .lobby-layout .deployment-info h3 { font-size: 20px; }
@@ -1722,7 +1650,6 @@ body.is-connected:not(.operation-active) .field-guide { position: static; margin
 body.is-connected:not(.operation-active) .map-coordinates,
 body.is-connected:not(.operation-active) .map-bottom-note { display: none; }
 .operation-active .lobby-heading { display: none; }
-.operation-active .operator-action { font-size: 7px; }
 .operation-over .end-screen { max-height: calc(100dvh - 140px); overflow: auto; }
 .operation-over .end-screen .comms-panel {
   display: block;
@@ -1739,7 +1666,6 @@ body.is-connected:not(.operation-active) .map-bottom-note { display: none; }
   body:not(.operation-active) .lobby-layout .invite-qr { width: min(100%, 300px); justify-self: center; }
   body:not(.operation-active) .lobby-layout .operator { padding: 11px 10px; gap: 10px; }
   body:not(.operation-active) .lobby-layout .operator-name { font-size: 11px; }
-  body:not(.operation-active) .lobby-layout .operator-action { padding: 8px 6px; font-size: 8px; }
   body:not(.operation-active) .lobby-layout .squad-heading h2 span { font-size: 8px; }
   body:not(.operation-active) .game-shell:has(#entry-panel:not([hidden])) { height: auto; min-height: 760px; }
   body:not(.operation-active) .field-guide { flex-wrap: wrap; row-gap: 12px; }

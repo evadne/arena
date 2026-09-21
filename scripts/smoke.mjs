@@ -128,15 +128,11 @@ try {
   check('text chat broadcasts to peers and stays inside its lobby');
 
   denied(await second.push('start', { user_id: first.id }), 'nonleader cannot spoof leader identity');
-  denied(await second.push('transfer', { user_id: second.id }), 'nonleader transfer denied');
-  denied(await second.push('formation', { formation: 'line' }), 'nonleader formation denied');
-  denied(await first.push('transfer', { user_id: isolated.id }), 'transfer outside lobby denied');
-  ok(await first.push('transfer', { user_id: second.id }), 'leader transfer');
-  await until(() => first.lobby.leader_id === second.id, 'leadership update');
-  denied(await first.push('start'), 'old leader start denied');
-  ok(await second.push('formation', { formation: 'wedge' }), 'formation');
-  await until(() => first.lobby.formation === 'wedge', 'formation broadcast');
-  check('only the current leader controls launch, transfer and formation');
+  denied(await first.push('transfer', { user_id: second.id }), 'manual leadership transfer removed');
+  denied(await first.push('formation', { formation: 'line' }), 'manual formation removed');
+  assert.equal(first.lobby.leader_id, first.id);
+  assert.equal('formation' in first.lobby, false);
+  check('first arrival leads; manual leadership and formation selection are unavailable');
 
   const third = new Client('Charlie', `S${nonce}`);
   const fourth = new Client('Delta', `S${nonce}`);
@@ -145,16 +141,18 @@ try {
   const fifth = new Client('Overflow', `S${nonce}`);
   denied(await fifth.connect(), 'fifth member rejected');
   fifth.close();
-  const oldSlot = first.lobby.members.find(member => member.id === first.id).slot;
+  await until(() => first.lobby.members.length === 4, 'full roster broadcast');
+  assert.deepEqual(first.lobby.members.map(member => [member.id, member.slot]), [[first.id,0],[second.id,1],[third.id,2],[fourth.id,3]]);
   denied(await first.push('slot', { slot: 99 }), 'invalid slot denied');
   denied(await first.push('slot', { slot: second.lobby.members.find(member => member.id === second.id).slot }), 'occupied slot denied');
-  assert(Number.isInteger(oldSlot));
   third.close();
   fourth.close();
   await until(() => first.lobby.members.length === 2, 'departures free slots');
-  check('four-person lobby capacity and slot validation');
+  denied(await first.push('slot', {slot:3}), 'even vacant slots are assigned automatically');
+  assert.deepEqual(first.lobby.members.map(member => member.slot),[0,1]);
+  check('four-person lobby capacity, join-order slots and no manual slot selection');
 
-  ok(await second.push('start'), 'leader launch');
+  ok(await first.push('start'), 'leader launch');
   await until(() => first.game?.status === 'playing', 'mission snapshot');
   assert(first.messages.some(m => m.event === 'frame'), 'protocol 3 acknowledged frames are active');
   const initial = structuredClone(first.game);
@@ -178,7 +176,7 @@ try {
   check('chat is disabled during active missions');
 
   for (const order of ['hold', 'form_up', 'aggro', 'auto', 'hold']) {
-    ok(await first.push('order', { order }), `nonleader issues ${order}`);
+    ok(await second.push('order', { order }), `nonleader issues ${order}`);
     await until(() => first.game.order === order && second.game.order === order, 'shared squad order');
   }
   denied(await first.push('order', { order: 'teleport' }), 'invalid order denied');
@@ -208,10 +206,11 @@ try {
   await until(() => player().ammo === 20 && player().reload_ms === 0, 'reload completes', 6000);
   check('movement, shooting and infinite-reserve 20-round reload reach the server');
 
-  denied(await first.push('reset'), 'nonleader reset denied');
+  denied(await second.push('reset'), 'nonleader reset denied');
   const departedId = first.id;
   first.close();
   await until(() => second.lobby.members.length === 1, 'operator disconnect');
+  assert.equal(second.lobby.leader_id, second.id, 'next arrival inherits leadership');
   await until(() => second.game.players.filter(p => p.bot).length === 3, 'disconnected operator replaced by AI');
   assert.equal(second.game.players.length, 4);
   assert(!second.game.players.some(p => p.id === departedId && !p.bot));

@@ -39,5 +39,11 @@ defmodule ArenaWeb.LobbyChannelTest do
     assert_reply(ref, :error)
     ref = push(socket, "slot", %{"slot" => 900})
     assert_reply(ref, :error)
+    ref = push(socket, "slot", %{"slot" => 1})
+    assert_reply(ref, :error)
+    ref = push(socket, "formation", %{"formation" => "wedge"})
+    assert_reply(ref, :error)
+    ref = push(socket, "transfer", %{"user_id" => socket.assigns.user_id})
+    assert_reply(ref, :error)
   end
 end

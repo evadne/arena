@@ -5,7 +5,7 @@ defmodule Arena.Game do
   @speed 140
   @reload 1500
 
-  def new(members, seed, formation \\ "stack", bot_names \\ nil) do
+  def new(members, seed, bot_names \\ nil) do
     map = World.generate(seed)
 
     players =
@@ -91,7 +91,6 @@ defmodule Arena.Game do
       map: map,
       players: players,
       enemies: enemies,
-      formation: formation,
       order: "auto",
       order_by: nil,
       shots: [],
@@ -138,11 +137,6 @@ defmodule Arena.Game do
           Enum.map(game.players, fn p -> if p.id == user_id, do: %{p | bot: true}, else: p end)
     }
   end
-
-  def set_formation(game, formation) when formation in ["stack", "wedge", "line"],
-    do: %{game | formation: formation}
-
-  def set_formation(game, _), do: game
 
   def set_order(game, order, requester_id) when order in ["hold", "form_up", "aggro", "auto"] do
     if game.status == "playing" and
@@ -475,7 +469,7 @@ defmodule Arena.Game do
             Enum.find(game.players, &(&1.hp > 0))
 
         if leader && leader.id != player.id do
-          offset = formation_offset(game.formation, player.slot)
+          offset = formation_offset(player.slot)
           {ox, oy} = rotate(offset, leader.angle)
           preferred = {leader.x + ox, leader.y + oy}
           goal = if World.fits?(game.map, preferred), do: preferred, else: pos(leader)
@@ -550,12 +544,7 @@ defmodule Arena.Game do
     end
   end
 
-  defp formation_offset("wedge", slot),
-    do: {-50.0 - div(slot, 2) * 34, if(rem(slot, 2) == 0, do: -1, else: 1) * 42.0}
-
-  defp formation_offset("line", slot), do: {-20.0, (slot - 1.5) * 43.0}
-
-  defp formation_offset(_, slot),
+  defp formation_offset(slot),
     do: {-48.0 - slot * 29, if(rem(slot, 2) == 0, do: -12.0, else: 12.0)}
 
   defp adversary(enemy, game, dt) do

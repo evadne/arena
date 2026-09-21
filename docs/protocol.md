@@ -10,22 +10,19 @@ Connect a Phoenix socket at `/socket` and join `lobby:CODE`, where the code is 4
 | `ping` | `{}` | Connection RTT probe; replies `ok` |
 | `chat` | `{text}` | Connected member outside active play |
 | `start` | `{}` | Leader in staging |
-| `transfer` | `{user_id}` | Leader; recipient must be connected |
-| `slot` | `{slot}` | Member in staging; free slot 0–3 |
 | `order` | `{order}` | Living human during play; hold, form_up, aggro or auto |
-| `formation` | `{formation}` | Leader in staging; stack, wedge or line |
 | `reset` | `{}` | Leader after won/lost; returns to staging |
 
 Input axes are clamped to −1…1 and normalized server-side. Aim is radians. Shoot/reload are booleans. Clients send intent at 30 Hz; the server simulates at 20 Hz and stops stale movement/fire after 250 ms without fresh input. Fire/reload presses are latched across updates so a quick press and release between ticks is not lost. Other actions reply `ok` or `error` with `{reason}`.
 
 ## Server events
 
-- `lobby`: `{code, leader_id, members: [{id, name, slot}], bot_names: [name, name, name, name], formation, status, chat}`.
+- `lobby`: `{code, leader_id, members: [{id, name, slot}], bot_names: [name, name, name, name], status, chat}`.
 - `chat`: `{id, name, text, at}`; text only, at most 280 characters. History retains the last 60 messages.
 - `frame`: an acknowledged keyframe or delta, described below.
 - `snapshot`: legacy viewer-specific game state (protocols 1 and 2).
 
-Status is `waiting`, `playing`, `won`, or `lost`. First arrival leads. When the leader exits, a random remaining human inherits leadership. When the final human leaves, the process terminates. A new arrival during play takes over a vacant bot slot with its existing position, health and ammunition.
+Status is `waiting`, `playing`, `won`, or `lost`. Staging slots follow join order from zero, with bots filling the remainder. Departures close gaps while waiting, and each new player joins at the end. The first arrival leads; when they leave, the oldest remaining player succeeds them. Manual `slot`, `transfer` and `formation` events are rejected. Deployment uses the default arrangement; `order` selects the in-game AI disposition. When the final human leaves, the process terminates. A new arrival during play takes over a vacant bot slot with its existing position, health and ammunition. During a round, existing slot numbers stay stable; `reset` restores join-order slots for the next briefing.
 
 ## Acknowledged delta frames (protocol 3)
 
@@ -76,7 +73,7 @@ Sound event types are `shot`, `reload`, `hit`, `death` and `round_end`. Event ID
 
 ## Engine API
 
-`Arena.Game.new(members, seed, formation \\ "stack")`, `step(game, inputs, dt_ms \\ 50)`, `public(game, user_id \\ nil)` , `disconnect(game, user_id)` and `set_order(game, order, requester_id)`. Inputs map user IDs to atom-keyed intent maps. Internal simulation state stays in the lobby process; PubSub relays current state without the shared history internally to Channels, which sanitize each snapshot for its recipient before JSON serialization.
+`Arena.Game.new(members, seed, bot_names \\ nil)`, `step(game, inputs, dt_ms \\ 50)`, `public(game, user_id \\ nil)` , `disconnect(game, user_id)` and `set_order(game, order, requester_id)`. Inputs map user IDs to atom-keyed intent maps. Internal simulation state stays in the lobby process; PubSub relays current state without the shared history internally to Channels, which sanitize each snapshot for its recipient before JSON serialization.
 
 ## Predicted controls and compensated shots
 

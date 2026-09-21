@@ -12,7 +12,12 @@ Execute in this order; keep the README aligned with the shipped behaviour.
 - [x] Integrate a vertical fireteam list above Deploy Squad in the lobby.
 - [x] Place chat below the fireteam list and deployment controls.
 
-Validation: 61 server tests, 38 client tests and the live socket smoke suite pass. Browser checks cover saved bindings and duplicate-key rejection, desktop and narrow-screen staging, invitations, peer chat, leadership transfer, deployment, keyboard squad orders and the visible reload ring. Production deployment is separate from this local usability work.
+Validation: 63 server tests, 38 client tests and the live socket smoke suite pass. Browser checks cover saved bindings and duplicate-key rejection, desktop and narrow-screen staging, invitations, peer chat, automatic leadership, deployment, keyboard squad orders and the visible reload ring. Production deployment is separate from this local usability work.
+
+### Simplify squad assembly
+
+- [x] Assign staging slots automatically in join order, followed by bots; remove Use Slot and its server action. Leadership follows the oldest connected player, with no manual transfer. Keep active-round actors stable and restore join order at the next briefing.
+- [x] Remove pre-deployment formation choices and their server action; use the default deployment arrangement and retain in-game disposition commands.
 
 ## Responsiveness follow-up
 

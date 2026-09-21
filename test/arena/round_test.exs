@@ -64,7 +64,7 @@ defmodule Arena.RoundTest do
     assert Enum.find(state.game.players, &(&1.id == "human")).ammo == 19
   end
 
-  test "leadership is transferred to a connected human during a mission", %{pid: pid} do
+  test "leadership passes to the next arrival during a mission", %{pid: pid} do
     owner =
       spawn(fn ->
         receive do
@@ -77,7 +77,7 @@ defmodule Arena.RoundTest do
     Arena.Lobby.join(pid, "c", "Charlie", self())
     Arena.Lobby.action(pid, "a", "start", %{})
     Process.exit(owner, :kill)
-    eventually(fn -> Arena.Lobby.state(pid).leader_id in ["b", "c"] end)
+    eventually(fn -> Arena.Lobby.state(pid).leader_id == "b" end)
     state = :sys.get_state(pid)
     assert state.status == "playing"
     assert Enum.count(state.game.players, & &1.bot) == 2
