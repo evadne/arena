@@ -160,7 +160,7 @@ try {
   const initial = structuredClone(first.game);
   assert.equal(initial.players.length, 4);
   assert.equal(initial.players.filter(player => player.bot).length, 2);
-  assert(Number.isInteger(initial.enemies_total) && initial.enemies_total >= 16 && initial.enemies_total <= 32, 'mission creates 16–32 hostiles');
+  assert(Number.isInteger(initial.enemies_total) && initial.enemies_total >= 12 && initial.enemies_total <= 20, 'mission creates 12–20 hostiles');
   assert.equal(initial.enemies_remaining, initial.enemies_total);
   assert.equal(initial.spectator, false);
   assert(initial.map.rooms.length >= 8 && initial.map.rooms.length <= 12, 'premises have 8–12 rooms');
@@ -173,7 +173,7 @@ try {
   assert.equal(second.game.enemies_total, initial.enemies_total);
   assert.equal(isolated.lobby.status, 'waiting');
   assert.equal(isolated.game, null);
-  check('launch creates four operators (two bots), 16–32 hostiles and one shared map');
+  check('launch creates four operators (two bots), 12–20 hostiles and one shared map');
   denied(await first.push('chat', { text: 'This must not be sent during combat.' }), 'combat chat denied');
   check('chat is disabled during active missions');
 
@@ -221,7 +221,7 @@ try {
   denied(await second.push('reset'), 'active mission reset is phase-gated');
   ok(await isolated.push('start'), 'solo launch');
   await until(() => isolated.game?.status === 'playing' && isolated.game.players.filter(p => p.bot).length === 3, 'one human plus three bots');
-  assert(isolated.game.enemies_total >= 16 && isolated.game.enemies_total <= 32);
+  assert(isolated.game.enemies_total >= 12 && isolated.game.enemies_total <= 20);
   assert.equal(isolated.game.enemies_remaining, isolated.game.enemies_total);
   check('reset permissions and phase gating; solo launch with three AI teammates');
 

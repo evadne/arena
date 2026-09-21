@@ -32,7 +32,9 @@ defmodule Arena.Game do
           end)
       end)
 
-    enemy_count = min(32, max(16, length(map.rooms) * 2 + World.random(seed, :enemy_count, 9)))
+    # One guard per room plus a reserve: three to five enemies per operator.
+    # The previous doubled room count made larger premises disproportionately hard.
+    enemy_count = min(20, max(12, length(map.rooms) + 4 + World.random(seed, :enemy_count, 5)))
 
     occupied_rooms =
       Enum.filter(map.rooms, fn room ->

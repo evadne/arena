@@ -59,7 +59,7 @@ defmodule Arena.GameTest do
       game = Game.new([hd(humans())], seed)
       assert length(game.players) == 4
       assert Enum.count(game.players, & &1.bot) == 3
-      assert length(game.enemies) in 16..32
+      assert length(game.enemies) in 12..20
       assert Game.public(game).enemies_total == length(game.enemies)
       assert Enum.uniq_by(game.enemies, &{&1.x, &1.y}) == game.enemies
       assert Enum.all?(game.enemies, &MapSet.member?(reached, World.tile({&1.x, &1.y})))

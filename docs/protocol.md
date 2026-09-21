@@ -67,7 +67,7 @@ Join replies retain a full `game` for immediate late-join display; the first str
 }
 ```
 
-Coordinates are world pixels. Maps are 1408×1024, with 32-pixel tiles. Four operators and 16–32 enemies spawn each round. Each connected floorplan contains 8–12 rooms, an irregular perimeter and an external staging area. For living viewers, enemy actors and hostile shot origins are filtered by shared squad vision. The blueprint remains available for navigation. A dead human gets `spectator: true`, all actors, all map tiles and all shots until the next round.
+Coordinates are world pixels. Maps are 1408×1024, with 32-pixel tiles. Four operators and 12–20 enemies spawn each round. Each connected floorplan contains 8–12 rooms, an irregular perimeter and an external staging area. For living viewers, enemy actors and hostile shot origins are filtered by shared squad vision. The blueprint remains available for navigation. A dead human gets `spectator: true`, all actors, all map tiles and all shots until the next round.
 
 Sound event types are `shot`, `reload`, `hit`, `death` and `round_end`. Event IDs remain stable over their 200 ms retention period; clients deduplicate them. The server filters audible events by the viewer's position and supplies distance gain and wall occlusion. Nearby unseen gunfire is an intentional sound cue, not visual knowledge. Spectators receive the full sound field. Clients synthesize and spatially pan the audio; they never invent combat events from unconfirmed input.
 

@@ -44,7 +44,7 @@ defmodule ArenaWeb.SpectatorChannelTest do
     end
 
     enemy_count = length(game.enemies)
-    assert enemy_count in 16..32
+    assert enemy_count in 12..20
     far_tiles = Enum.sort_by(game.map.floor, distance_from_squad, :desc) |> Enum.take(enemy_count)
     assert length(far_tiles) == enemy_count
     assert length(Enum.uniq(far_tiles)) == enemy_count

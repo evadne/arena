@@ -2,7 +2,7 @@
 
 **Play: [evadne-arena.fly.dev](https://evadne-arena.fly.dev)** — one Fly.io Machine in London (`lhr`).
 
-A browser-based, real-time cooperative room-clearing prototype. One to four humans, four operators, and 16–32 hostiles. Phoenix Channels carry input and snapshots; each lobby runs its own authoritative Elixir simulation.
+A browser-based, real-time cooperative room-clearing prototype. One to four humans, four operators, and 12–20 hostiles. Phoenix Channels carry input and snapshots; each lobby runs its own authoritative Elixir simulation.
 
 ## Run
 
@@ -45,7 +45,7 @@ node --test scripts/*.test.mjs
 ARENA_PROTOCOL=3 node scripts/network_probe.mjs
 ```
 
-See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md).
+See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md). The [movement prediction investigation](docs/movement-prediction.md) describes proposed next steps; prediction is not enabled yet.
 
 ## Deployment notes and limits
 
