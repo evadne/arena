@@ -23,7 +23,7 @@ For another machine on your LAN, use the host machine's LAN address and port 400
 - **WASD** movement by default. Bindings use physical keyboard positions.
 - **Mouse** aim. Your laser stays visible and stops at walls.
 - **Left mouse button** fire; hold for repeated shots.
-- **R** reload a 20-round magazine. Reserve ammunition is unlimited.
+- **R** reload a 20-round magazine. Reserve ammunition is unlimited. An amber progress ring and RELOAD label mark reloading operators.
 - **1 / Hold**, **2 / Form up**, **3 / Aggro**, **4 / Auto** give the AI teammates general orders. Any living human can issue orders; bots defend themselves and reposition under fire.
 - Chat is available in staging and after the round, and disabled during missions. Sound starts after your first interaction and can be muted in the interface.
 

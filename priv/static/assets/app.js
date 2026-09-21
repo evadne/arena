@@ -428,7 +428,7 @@ function renderRoster() {
     if (player)
       detail.textContent =
         player.hp > 0
-          ? `${Math.ceil(player.hp)} HP / ${player.bot ? "AI SUPPORT" : "ACTIVE"}`
+          ? `${Math.ceil(player.hp)} HP / ${player.reload_ms > 0 ? "RELOADING" : player.bot ? "AI SUPPORT" : "ACTIVE"}`
           : "OPERATOR DOWN";
     info.append(name, detail);
     row.append(number, info);
@@ -694,7 +694,7 @@ function receiveSnapshot(game) {
     const el = $(`operator-status-${p.slot}`);
     if (el)
       setText(el, p.hp > 0
-          ? `${Math.ceil(p.hp)} HP / ${p.bot ? "AI SUPPORT" : "ACTIVE"}`
+          ? `${Math.ceil(p.hp)} HP / ${p.reload_ms > 0 ? "RELOADING" : p.bot ? "AI SUPPORT" : "ACTIVE"}`
           : "OPERATOR DOWN");
   });
   for (const event of game.events || []) {
@@ -1296,6 +1296,24 @@ function drawOperator(p, angle, me, enemy) {
     ctx.beginPath();
     ctx.arc(0, 0, 16, 0, Math.PI * 2);
     ctx.stroke();
+  }
+  if (!enemy && p.reload_ms > 0) {
+    // The server's reload lasts 1,500 ms. Keep the ring until completion is confirmed.
+    const radius = Math.max(24, 13 / view.scale);
+    const progress = 1 - Math.min(1, p.reload_ms / 1500);
+    ctx.lineWidth = 2 / view.scale;
+    ctx.strokeStyle = "#efcc7840";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "#efcc78";
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#efcc78";
+    ctx.textAlign = "center";
+    ctx.font = `${7 / view.scale}px monospace`;
+    ctx.fillText("RELOAD", 0, radius + 11 / view.scale);
   }
   ctx.save();
   ctx.rotate(angle);
