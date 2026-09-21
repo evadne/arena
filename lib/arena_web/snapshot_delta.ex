@@ -1,6 +1,6 @@
 defmodule ArenaWeb.SnapshotDelta do
   @moduledoc """
-  Pure encoding of personalized snapshots against an acknowledged baseline.
+  Pure encoding of personalized snapshots against the previous sent baseline.
 
   Geometry is immutable within a seed. Actor and tile collections are keyed by
   ID and coordinate respectively. Shots and sounds are transient new-ID emissions,

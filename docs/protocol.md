@@ -28,7 +28,7 @@ Status is `waiting`, `playing`, `won`, or `lost`. First arrival leads. When the 
 
 ## Acknowledged delta frames (protocol 3)
 
-The first frame of a round contains `{seq, base: null, full: snapshot}`. The full snapshot includes the floorplan. Subsequent frames describe changes against the last acknowledged frame:
+The first frame of a round contains `{seq, base: null, full: snapshot}`. The full snapshot includes the floorplan. Subsequent frames describe changes against the immediately previous sent frame. WebSocket delivery is reliable and ordered, so the receiver has that baseline when it processes the next frame:
 
 ```js
 {
@@ -43,7 +43,9 @@ The first frame of a round contains `{seq, base: null, full: snapshot}`. The ful
 
 Empty fields are omitted. `players` and `enemies` have sparse `upsert` records and `remove` IDs; newly visible actors get complete records. `visible_tiles` and `explored_tiles` are set additions/removals. `changes` contains changed scalar snapshot fields only. Names, unchanged health/ammunition and geometry are not repeated. Positions are authoritative absolute coordinates; timestamps and the browser's position history supply interpolation, so no redundant velocity fields are sent. Shots/events include only newly encountered IDs and are empty when absent. They are cosmetic and may be skipped after a long stall; persistent state always catches up.
 
-After reconstructing a frame, send `frame_ack` with `{seq}` (no reply). The server permits one unacknowledged frame per Channel. While waiting, incoming ticks replace a single pending state, before visibility filtering or JSON encoding. On acknowledgement the newest state is sent, subject to a 50 ms minimum send interval. Thus the maximum is 20 updates/second, and slow clients adapt down to their acknowledgement rate without accumulating snapshot history. Rendering uses a bounded 100 ms interpolation buffer, clamps to the newest position and never extrapolates through walls. There is no client movement prediction or lag-compensated shooting yet.
+After reconstructing a frame, send `frame_ack` with `{seq}` (no reply). Acknowledgements are cumulative and valid only for actually outstanding frame numbers. The server permits at most four unacknowledged frames per Channel, with a 50 ms minimum send interval. This small pipeline sustains 20 updates/second through ordinary round-trip delay instead of stopping after every frame to wait for a reply. When the window is full, incoming ticks replace a single pending state before visibility filtering or JSON encoding. An acknowledgement frees space for the newest pending state; old pending ticks are not queued. Very slow clients still adapt down, and memory/transport backlog remain bounded.
+
+Deltas form a chain against the last sent baseline; `frame_ack` controls the send window, not which snapshot supplies the next delta baseline. A missing baseline still triggers a full resync. Rendering uses bounded interpolation buffers: 50 ms for the living local player and 100 ms for remote actors. Position rendering clamps to the newest known state and never extrapolates through walls. Movement direction changes are sent immediately, in addition to 30 Hz held-input refreshes. There is no client movement prediction or lag-compensated shooting yet.
 
 A missing/wrong baseline triggers `frame_resync` with `{}` (no reply): the next frame is full. Resync requests are limited to once per second. Frame numbers stay monotonic across rounds within a Channel; old acknowledgements/timers are ignored. A client that fails to acknowledge for 15 seconds loses its Channel; Phoenix rejoins automatically with fresh state. Other players and the simulation continue independently. A new socket identity can only reclaim an available bot slot. As with all departures, an empty lobby closes.
 

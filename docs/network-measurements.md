@@ -36,3 +36,13 @@ The first arrival creates and starts the operation; the second joins it. Each pr
 ```sh
 ARENA_PROTOCOL=3 PROBE_ACK_DELAY_MS=300 PROBE_SECONDS=5 node scripts/network_probe.mjs
 ```
+
+## Movement regression follow-up
+
+The initial stop-and-wait policy limited delivery to one frame per acknowledgement round trip. It has been replaced by a four-frame window, still capped at 20 Hz. Deltas chain against the previous sent snapshot over reliable ordered WebSockets, and cumulative acknowledgements free window capacity. Beyond the window, only the newest pending simulation state is kept. Resync and visibility filtering are preserved.
+
+A six-second local test with every acknowledgement deliberately delayed 120 ms delivered 118 frames covering 116 simulation ticks. Median arrival spacing was 51.0 ms, p95 52.3 ms, maximum 54.8 ms, with no gaps over 100 ms. This verifies that acknowledgement delay no longer forces stop-and-wait cadence under those conditions. Earlier follow-up probes ran while the Mac had very high system load, so they are not a controlled before/after performance comparison.
+
+The living local actor now has a separate 50 ms interpolation timeline; remote actors retain 100 ms. Movement direction changes send immediately alongside the regular 30 Hz refresh. Aim uses the displayed local origin, and hidden tabs skip canvas drawing. This is a responsiveness correction, not movement prediction or server rewind. Verification now includes 52 server tests and 24 client tests plus the live socket smoke test.
+
+Fly capacity was increased to two shared CPUs and 1 GB RAM on the same single London Machine. `fly.toml` explicitly persists `shared-cpu-2x` for subsequent releases.

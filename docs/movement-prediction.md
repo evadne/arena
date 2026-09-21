@@ -1,16 +1,16 @@
 # Movement prediction investigation
 
-Status: design only. No movement or networking implementation is changed by this document. Findings below come from this repository; there are no new latency measurements or external reference claims.
+Status: prediction design only. Prediction remains unimplemented; transport and interpolation were subsequently adjusted as described below. Findings below come from this repository; there are no new latency measurements or external reference claims.
 
 ## Current behavior
 
-- `priv/static/assets/app.js` sends the latest held direction, aim and fire state at 30 Hz. Pointer-down sends an extra input immediately, and release/blur sends a stop. Movement key changes currently wait for the next interval.
+- `priv/static/assets/app.js` sends the latest held direction, aim and fire state at 30 Hz. Pointer-down sends an extra input immediately, and release/blur sends a stop. Movement key changes now send immediately as well.
 - `ArenaWeb.LobbyChannel.handle_in("input", ...)` clamps direction components to [-1, 1]. It accepts no position or movement duration from the client.
 - `Arena.Lobby.handle_cast({:input, ...})` replaces each user's held input. It separately OR-latches shoot/reload so a brief action survives until a simulation tick.
 - `Arena.Lobby.handle_info(:tick, ...)` samples that held direction once per 50 ms simulation step. Inputs received at least 250 ms ago become neutral. A direction can be used for zero, one or several ticks. The timer accounts for compute time; an overloaded process can still advance simulation time more slowly than wall time.
 - `Arena.Game.step/3` moves a living human at 140 pixels/second, normalizes diagonal direction, and calls `Arena.Game.Map.move/3` with the tick displacement. Human movement is followed by authoritative shooting and enemy actions.
-- Protocol 3 sends at most one unacknowledged snapshot frame, retaining only the newest pending simulation state. Its frame sequence acknowledges decoding, not input processing. With nontrivial round-trip delay, update frequency is bounded by acknowledgement turnaround as well as the 50 ms minimum send interval. Simulation and incoming input continue independently.
-- The client currently interpolates all actor positions approximately 100 ms behind snapshot simulation time. Its own aim responds immediately, but uses its latest authoritative origin.
+- Protocol 3 now permits at most four unacknowledged snapshot frames, retaining only the newest pending simulation state beyond that bounded window. Its frame sequence acknowledges decoding, not input processing. With nontrivial round-trip delay, update frequency is bounded by acknowledgement turnaround as well as the 50 ms minimum send interval. Simulation and incoming input continue independently.
+- The client now interpolates local actor positions approximately 50 ms behind snapshot simulation time, with remote actors at 100 ms. Local aim responds immediately from the displayed local origin.
 
 ## Why sequence-only command replay is incorrect here
 
@@ -53,7 +53,7 @@ Exact rules to port:
 
 Start with a conservative forecast horizon of 100–150 ms, and measure correction distances before expanding it. This is a proposed setting, not a measured requirement. Bound prediction relative to the latest authoritative simulation tick, not by the number of received packets. If a slow client has no new state, stop advancing at the cap instead of walking indefinitely into unknown outcomes. Reset the estimate after long stalls or tab visibility changes; do not simulate a large accumulated animation `dt`.
 
-One-inflight snapshot backpressure means a slow connection may have snapshots further apart than the interpolation delay. Local prediction should not be coupled to sending a frame acknowledgement, and should not remove that backpressure. The horizon deliberately limits how far a client can look smooth while authoritative state is unavailable; remote actors continue to hold at their newest known state. Under serious network delay, some correction or holding is preferable to unconstrained invention.
+Bounded-window snapshot backpressure means a slow connection may have snapshots further apart than the interpolation delay. Local prediction should not be coupled to sending a frame acknowledgement, and should not remove that backpressure. The horizon deliberately limits how far a client can look smooth while authoritative state is unavailable; remote actors continue to hold at their newest known state. Under serious network delay, some correction or holding is preferable to unconstrained invention.
 
 Keep logical predicted position separate from a small decaying visual correction offset. Apply authoritative corrections immediately to logical state. Smooth only small safe visual differences; check that the rendered center still fits and that the correction path is safe. Snap on blocked corrections, large displacements, deaths, teleport-like round spawns or epoch changes. Linear smoothing across a concave corner can visually cut through walls even if both endpoints fit.
 

@@ -4,7 +4,7 @@ Live application: [evadne-arena.fly.dev](https://evadne-arena.fly.dev). The init
 
 The production image is a Phoenix release built with Elixir 1.19.5 and Erlang/OTP 28.3.3 on Debian Bookworm. The smaller runtime image runs as an unprivileged user. Browser assets are already in `priv/static`; no Node build, database, volume, or distributed Erlang cluster is required.
 
-`fly.toml` targets one shared CPU Machine with 512 MB RAM in London (`lhr`). The app name is `evadne-arena` in the personal organization. To deploy another instance, change both `app` and `[env].HOST`. The hostname must match the browser's HTTPS origin for Phoenix Channels.
+`fly.toml` targets one Machine with two shared CPUs and 1 GB RAM in London (`lhr`). The app name is `evadne-arena` in the personal organization. To deploy another instance, change both `app` and `[env].HOST`. The hostname must match the browser's HTTPS origin for Phoenix Channels.
 
 ## First deployment
 
@@ -35,7 +35,7 @@ fly machine list --app evadne-arena
 curl --fail https://evadne-arena.fly.dev/health
 ```
 
-Confirm exactly one application Machine is running in `lhr`, with the configured shared CPU and 512 MB memory. Open [the application](https://evadne-arena.fly.dev) in two browser sessions, join the same lobby, and verify team membership, lobby chat, game start, movement, and a second round. A second distinct lobby should remain isolated. The `/health` check verifies HTTP availability; the two-session check verifies Phoenix WebSocket behavior.
+Confirm exactly one application Machine is running in `lhr`, with the configured two shared CPUs and 1 GB memory. Open [the application](https://evadne-arena.fly.dev) in two browser sessions, join the same lobby, and verify team membership, lobby chat, game start, movement, and a second round. A second distinct lobby should remain isolated. The `/health` check verifies HTTP availability; the two-session check verifies Phoenix WebSocket behavior.
 
 ## Subsequent releases and operations
 

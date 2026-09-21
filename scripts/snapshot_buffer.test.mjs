@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SnapshotBuffer, mergeSnapshotMap, interpolateActor } from "../priv/static/assets/snapshot_buffer.mjs";
+import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "../priv/static/assets/snapshot_buffer.mjs";
 
 const actor = (id, x, extra = {}) => ({ id, x, y: 0, angle: 0, hp: 100, ...extra });
 const frame = (time, extra = {}) => ({ seed: 1, elapsed_ms: time,
@@ -95,4 +95,53 @@ test("static map is reused only within the same operation", () => {
   assert.equal(mergeSnapshotMap(frame(50), null), null);
   const full = { ...frame(0, { seed: 2 }), map: { walls: [2] } };
   assert.equal(mergeSnapshotMap(full, current), full);
+});
+
+
+test("local playback responds 50ms sooner without advancing the remote timeline", () => {
+  const local = new SnapshotBuffer(50);
+  const remote = new SnapshotBuffer(100);
+  for (const time of [0, 50, 100, 150]) {
+    local.push(frame(time), 1000 + time);
+    remote.push(frame(time), 1000 + time);
+  }
+  assert.equal(position(local, 1150), 10);
+  assert.equal(position(remote, 1150), 5);
+  assert.equal(position(local, 1175), 12.5);
+  assert.equal(position(remote, 1175), 7.5);
+  assert.equal(position(local, 1200), 15);
+  assert.equal(position(remote, 1200), 10);
+  // Repeated pointer/input sampling must not move either playback clock back.
+  assert.equal(position(local, 1190), 15);
+  assert.equal(position(remote, 1200), 10);
+});
+
+test("local playback remains bounded during stalls and resets on round change", () => {
+  const local = new SnapshotBuffer(50);
+  local.push(frame(0), 1000);
+  local.push(frame(50), 1050);
+  assert.equal(position(local, 1100), 5);
+  assert.equal(position(local, 5000), 5);
+  const dead = actor("player", 9, { hp: 0 });
+  assert.deepEqual(interpolateActor(dead, local.sample(5010), "players"), dead);
+  local.push(frame(0, { seed: 2, players: [actor("player", 80)] }), 5020);
+  assert.equal(position(local, 5020), 80);
+  local.clear();
+  assert.equal(local.sample(5030), null);
+});
+
+test("local laser tracks a stationary cursor from the same interpolated position", () => {
+  const local = new SnapshotBuffer(50);
+  local.push(frame(0), 1000);
+  local.push(frame(50), 1050);
+  const cursor = { x: 40, y: 30 };
+  for (const now of [1050, 1060, 1075, 1090, 1100]) {
+    const displayed = interpolateActor(frame(50).players[0], local.sample(now), "players");
+    const angle = aimAt(displayed, cursor);
+    const distance = Math.hypot(cursor.x - displayed.x, cursor.y - displayed.y);
+    assert.ok(Math.abs(displayed.x + Math.cos(angle) * distance - cursor.x) < 1e-9);
+    assert.ok(Math.abs(displayed.y + Math.sin(angle) * distance - cursor.y) < 1e-9);
+  }
+  assert.equal(aimAt(null, cursor, 1.2), 1.2);
+  assert.equal(aimAt(actor("player", 0), null, 1.2), 1.2);
 });

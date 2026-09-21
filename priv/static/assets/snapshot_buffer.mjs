@@ -72,3 +72,11 @@ export function interpolateActor(latest, sample, kind) {
     angle: from.angle + delta * sample.t,
   };
 }
+
+// Use the same visual origin as the local operator/laser, including while its
+// position is interpolating between server ticks and the mouse stays still.
+export function aimAt(actor, mouse, fallback = 0) {
+  return actor && mouse
+    ? Math.atan2(mouse.y - actor.y, mouse.x - actor.x)
+    : fallback;
+}

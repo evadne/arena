@@ -1,10 +1,11 @@
 import { Socket } from "./phoenix.mjs";
-import { SnapshotBuffer, mergeSnapshotMap, interpolateActor } from "./snapshot_buffer.mjs";
+import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "./snapshot_buffer.mjs";
 
 import { FrameDecoder } from "./frame_decoder.mjs";
 import { inviteURL, inviteQRSvg } from "./invite_qr.mjs";
 
 const snapshots = new SnapshotBuffer();
+const localSnapshots = new SnapshotBuffer(50);
 const frames = new FrameDecoder();
 let frameResyncPending = false;
 
@@ -16,6 +17,7 @@ const state = {
   lobby: null,
   game: null,
   fogCells: [],
+  displayedLocal: null,
   inviteQrUrl: null,
   connected: false,
   joining: false,
@@ -123,7 +125,7 @@ function join(code) {
       state.game = null;
       frames.reset();
       frameResyncPending = false;
-      snapshots.clear();
+      clearPlayback();
       state.shots.clear();
     }
     renderRoster();
@@ -159,7 +161,7 @@ function join(code) {
       state.game = null;
       frames.reset();
       frameResyncPending = false;
-      snapshots.clear();
+      clearPlayback();
       state.shots.clear();
       state.lastAmmo = null;
       state.audioEvents.clear();
@@ -201,7 +203,7 @@ function disconnect(clearUrl = true) {
   state.game = null;
   frames.reset();
   frameResyncPending = false;
-  snapshots.clear();
+  clearPlayback();
   state.connected = false;
   state.joining = false;
   state.shots.clear();
@@ -533,23 +535,30 @@ function setText(element, value) {
 function setHTML(element, value) {
   if (element.innerHTML !== value) element.innerHTML = value;
 }
+function clearPlayback() {
+  snapshots.clear();
+  localSnapshots.clear();
+  state.displayedLocal = null;
+}
 function receiveSnapshot(game) {
   if (!game) {
     state.game = null;
-    snapshots.clear();
+    clearPlayback();
     updateUI();
     renderRoster();
     return;
   }
   if (state.game?.seed !== game.seed || game.tick < (state.game?.tick || 0)) {
-    snapshots.clear();
+    clearPlayback();
     state.shots.clear();
     state.audioEvents.clear();
   }
   game = mergeSnapshotMap(game, state.game);
   if (!game) return;
   state.game = game;
-  snapshots.push(game, performance.now());
+  const arrival = performance.now();
+  snapshots.push(game, arrival);
+  localSnapshots.push(game, arrival);
   const visible = new Set((game.visible_tiles || []).map(([x, y]) => `${x},${y}`));
   const explored = new Set((game.explored_tiles || []).map(([x, y]) => `${x},${y}`));
   const size = game.map.tile_size;
@@ -655,13 +664,16 @@ window.addEventListener("keydown", (event) => {
     ).includes(key)
   ) {
     if (phase() === "playing") event.preventDefault();
+    const wasHeld = state.keys.has(key);
     state.keys.add(key);
     if (key === "r" && !event.repeat) state.reload = true;
+    if (key !== "r" && !event.repeat && !wasHeld) sendInput();
   }
 });
-window.addEventListener("keyup", (event) =>
-  state.keys.delete(event.key.toLowerCase()),
-);
+window.addEventListener("keyup", (event) => {
+  const key = event.key.toLowerCase();
+  if (state.keys.delete(key) && key !== "r") sendInput();
+});
 window.addEventListener("blur", releaseInput);
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) releaseInput();
@@ -683,13 +695,7 @@ canvas.addEventListener("pointerdown", (event) => {
   state.shoot = true;
   canvas.setPointerCapture?.(event.pointerId);
   updateAim();
-  if (state.connected && phase() === "playing" && !state.game?.spectator)
-    state.channel.push("input", {
-      ...movement(),
-      aim: state.aim,
-      shoot: true,
-      reload: false,
-    });
+  sendInput();
 });
 window.addEventListener("pointerup", () => {
   state.shoot = false;
@@ -699,10 +705,9 @@ canvas.addEventListener("lostpointercapture", () => {
   state.shoot = false;
 });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-function updateAim() {
-  const me = state.game?.players.find((p) => p.id === state.userId);
-  if (me && state.mouse)
-    state.aim = Math.atan2(state.mouse.y - me.y, state.mouse.x - me.x);
+function updateAim(origin = state.displayedLocal) {
+  const me = origin || state.game?.players.find((p) => p.id === state.userId);
+  state.aim = aimAt(me, state.mouse, state.aim);
 }
 function movement() {
   const k = state.keys,
@@ -712,7 +717,7 @@ function movement() {
     y: Number(k.has(edsf ? "d" : "s")) - Number(k.has(edsf ? "e" : "w")),
   };
 }
-setInterval(() => {
+function sendInput() {
   if (
     !state.connected ||
     phase() !== "playing" ||
@@ -729,7 +734,8 @@ setInterval(() => {
     reload: state.reload,
   });
   state.reload = false;
-}, 1000 / 30);
+}
+setInterval(sendInput, 1000 / 30);
 function unlockAudio() {
   if (state.muted) return;
   const Audio = window.AudioContext || window.webkitAudioContext;
@@ -933,6 +939,10 @@ function rayEnd(x, y, angle, map, max = 850) {
   return { x: x + dx * distance, y: y + dy * distance };
 }
 function render(now) {
+  if (document.hidden) {
+    requestAnimationFrame(render);
+    return;
+  }
   resize();
   const game = state.game,
     map = game?.map || preview;
@@ -1054,7 +1064,12 @@ function render(now) {
   }
   if (game) {
     const sample = snapshots.sample(now);
-    const players = game.players.map((p) => interpolateActor(p, sample, "players"));
+    const localSample = localSnapshots.sample(now);
+    const players = game.players.map((p) => interpolateActor(
+      p, p.id === state.userId ? localSample : sample, "players",
+    ));
+    state.displayedLocal = players.find((p) => p.id === state.userId) || null;
+    updateAim();
     for (const player of players) {
       const me = player.id === state.userId,
         angle = me ? state.aim : player.angle;

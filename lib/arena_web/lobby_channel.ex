@@ -1,6 +1,7 @@
 defmodule ArenaWeb.LobbyChannel do
   use Phoenix.Channel
   @frame_interval 50
+  @frame_window 4
   @ack_timeout 15_000
   @impl true
   def join("lobby:" <> code, payload, socket) do
@@ -23,8 +24,8 @@ defmodule ArenaWeb.LobbyChannel do
         |> assign(:snapshot_tick, reply.game && reply.game.tick)
         |> assign(:stream, %{
           seq: 0,
-          baseline: nil,
-          inflight: nil,
+          last_sent: nil,
+          inflight: [],
           pending: nil,
           latest: nil,
           sent_at: nil,
@@ -56,14 +57,15 @@ defmodule ArenaWeb.LobbyChannel do
   def handle_in("frame_ack", %{"seq" => seq}, %{assigns: %{protocol: 3}} = socket) do
     stream = socket.assigns.stream
 
-    case stream.inflight do
-      %{seq: ^seq, snapshot: snapshot, timer: timer} ->
-        Process.cancel_timer(timer)
-        stream = %{stream | baseline: {seq, snapshot}, inflight: nil}
-        {:noreply, schedule_frame(assign(socket, :stream, stream))}
-
-      _ ->
-        {:noreply, socket}
+    # ACKs are cumulative, but only an actually outstanding sequence can release
+    # window capacity. Future and old ACKs must not alter the ordered delta chain.
+    if Enum.any?(stream.inflight, &(&1.seq === seq)) do
+      {acked, outstanding} = Enum.split_while(stream.inflight, &(&1.seq <= seq))
+      Enum.each(acked, &Process.cancel_timer(&1.timer))
+      stream = %{stream | inflight: outstanding}
+      {:noreply, schedule_frame(assign(socket, :stream, stream))}
+    else
+      {:noreply, socket}
     end
   end
 
@@ -72,8 +74,9 @@ defmodule ArenaWeb.LobbyChannel do
     now = System.monotonic_time(:millisecond)
 
     if is_nil(stream.resync_at) or now - stream.resync_at >= 1000 do
-      if stream.inflight, do: Process.cancel_timer(stream.inflight.timer)
-      stream = %{stream | baseline: nil, inflight: nil, pending: stream.latest, resync_at: now}
+      latest = stream.latest
+      stream = clear_stream(stream)
+      stream = %{stream | pending: latest, latest: latest, resync_at: now}
       {:noreply, schedule_frame(assign(socket, :stream, stream))}
     else
       {:noreply, socket}
@@ -91,8 +94,8 @@ defmodule ArenaWeb.LobbyChannel do
   def handle_in(_, _, socket), do: {:reply, {:error, %{reason: "Unknown action."}}, socket}
   @impl true
   def handle_info({:game_snapshot, game}, %{assigns: %{protocol: 3}} = socket) do
-    # Coalesce before personalization and encoding: a slow reader holds just one
-    # sent frame and the newest simulation state, never a queue of old updates.
+    # A small window keeps 20 Hz updates flowing across normal network latency.
+    # Beyond that window only the newest state survives; never queue old ticks.
     stream = %{socket.assigns.stream | pending: game, latest: game}
     {:noreply, schedule_frame(assign(socket, :stream, stream))}
   end
@@ -110,7 +113,7 @@ defmodule ArenaWeb.LobbyChannel do
 
   def handle_info({:frame_timeout, seq}, socket) do
     case socket.assigns.stream.inflight do
-      %{seq: ^seq} -> {:stop, :frame_ack_timeout, socket}
+      [%{seq: ^seq} | _] -> {:stop, :frame_ack_timeout, socket}
       _ -> {:noreply, socket}
     end
   end
@@ -131,10 +134,7 @@ defmodule ArenaWeb.LobbyChannel do
 
   def handle_info({:lobby, %{status: "waiting"} = payload}, socket) do
     push(socket, "lobby", payload)
-    stream = socket.assigns.stream
-    if stream.inflight, do: Process.cancel_timer(stream.inflight.timer)
-    if stream.flush, do: Process.cancel_timer(elem(stream.flush, 1))
-    stream = %{stream | baseline: nil, inflight: nil, pending: nil, latest: nil, flush: nil}
+    stream = clear_stream(socket.assigns.stream)
 
     {:noreply,
      socket
@@ -156,7 +156,7 @@ defmodule ArenaWeb.LobbyChannel do
     remaining = if stream.sent_at, do: max(0, @frame_interval - (now - stream.sent_at)), else: 0
 
     cond do
-      stream.inflight != nil or stream.pending == nil or stream.flush != nil ->
+      length(stream.inflight) >= @frame_window or stream.pending == nil or stream.flush != nil ->
         socket
 
       remaining > 0 ->
@@ -166,21 +166,30 @@ defmodule ArenaWeb.LobbyChannel do
 
       true ->
         snapshot = Arena.Game.public(stream.pending, socket.assigns.user_id)
-        {base_seq, baseline} = stream.baseline || {nil, nil}
+        # WebSocket delivery is reliable and ordered. Each delta chains from the
+        # last sent frame, even while its ACK is still travelling back to us.
+        {base_seq, baseline} = stream.last_sent || {nil, nil}
         seq = stream.seq + 1
         frame = ArenaWeb.SnapshotDelta.encode(snapshot, baseline, seq, base_seq)
         push(socket, "frame", frame)
         timer = Process.send_after(self(), {:frame_timeout, seq}, @ack_timeout)
-        inflight = %{seq: seq, snapshot: snapshot, timer: timer}
+        inflight = stream.inflight ++ [%{seq: seq, timer: timer}]
 
         assign(socket, :stream, %{
           stream
           | seq: seq,
+            last_sent: {seq, snapshot},
             inflight: inflight,
             pending: nil,
             sent_at: now
         })
     end
+  end
+
+  defp clear_stream(stream) do
+    Enum.each(stream.inflight, &Process.cancel_timer(&1.timer))
+    if stream.flush, do: Process.cancel_timer(elem(stream.flush, 1))
+    %{stream | last_sent: nil, inflight: [], pending: nil, latest: nil, flush: nil}
   end
 
   defp number(v, lo, hi) when is_number(v), do: v |> max(lo) |> min(hi)
