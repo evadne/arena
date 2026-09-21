@@ -13,7 +13,7 @@
         <canvas
           id="game-canvas"
           tabindex="0"
-          aria-label="Tactical map. Use WASD or EDSF to move, mouse to aim, left click to fire, and R to reload."
+          aria-label="Tactical map. Use your movement keys, mouse to aim and left click to fire. Open Controls to change keybindings."
         ></canvas>
         <div class="scene-vignette"></div>
         <div class="scene-grain"></div>
@@ -46,6 +46,7 @@
           <button class="text-button" id="leave-lobby">LEAVE ↗</button>
         </div>
         <div class="header-meta">
+          <button class="icon-button" id="open-controls" aria-haspopup="dialog">CONTROLS</button>
           <span class="connection" id="connection"><i></i>OFFLINE</span
           ><button
             class="icon-button"
@@ -221,20 +222,26 @@
       ></div>
       <section class="field-guide" aria-label="Game controls">
         <div class="control-item">
-          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
-          <label class="select-label"
-            ><select id="control-scheme" aria-label="Movement key layout">
-              <option value="wasd">WASD movement</option>
-              <option value="edsf">EDSF movement</option>
-            </select></label
-          >
+          <div id="movement-keys"></div><span>MOVE</span>
         </div>
-        <span><b>MOUSE</b> AIM + FIRE</span><span><kbd>R</kbd> RELOAD</span
+        <span><b>MOUSE</b> AIM + FIRE</span><span><kbd id="reload-key">R</kbd> RELOAD</span
         ><span class="guide-objective"
           >04 OPERATORS <i>/</i> 12–20 HOSTILES</span
         >
       </section>
     </main>
+    <dialog id="controls-dialog" aria-labelledby="controls-title" aria-describedby="controls-help">
+      <h2 id="controls-title">Your controls</h2>
+      <p id="controls-help">Select a binding, then press a key. Mouse aims; left click fires. Changes save in this browser.</p>
+      <p class="controls-note">The mission continues while this dialog is open. Your operator stops moving and firing.</p>
+      <div id="binding-list"></div>
+      <p id="binding-status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="reset-bindings" class="secondary">Reset defaults</button>
+        <button type="button" id="cancel-bindings" class="secondary">Cancel</button>
+        <button type="button" id="save-bindings" class="primary">Save controls</button>
+      </div>
+    </dialog>
     <script type="module" src="/assets/app.js"></script>
   </body>
 </html>

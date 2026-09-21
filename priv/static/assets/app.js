@@ -1,3 +1,4 @@
+import { ACTIONS, DEFAULT_BINDINGS, STORAGE_KEY, loadBindings, bindingError, keyLabel, supportedKey, movementFor } from "./keybindings.mjs";
 import { Socket } from "./phoenix.mjs";
 import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "./snapshot_buffer.mjs";
 
@@ -29,7 +30,7 @@ const state = {
   reload: false,
   aim: 0,
   mouse: null,
-  scheme: readStorage("breach-scheme", "wasd"),
+  bindings: loadBindings(readStorage(STORAGE_KEY, null), readStorage("breach-scheme", "wasd")),
   muted: readStorage("breach-muted", "false") === "true",
   sound: null,
   shots: new Map(),
@@ -51,10 +52,10 @@ function readStorage(key, fallback) {
 function saveStorage(key, value) {
   try {
     localStorage.setItem(key, value);
-  } catch {}
+    return true;
+  } catch { return false; }
 }
 $("player-name").value = readStorage("breach-name", "");
-$("control-scheme").value = state.scheme;
 const incomingCode = new URL(location.href).searchParams.get("lobby");
 if (incomingCode)
   $("lobby-code").value = incomingCode
@@ -257,22 +258,91 @@ $("formations").addEventListener("click", (e) => {
   const button = e.target.closest("button");
   if (button) action("formation", { formation: button.dataset.formation });
 });
-$("control-scheme").addEventListener("change", (e) => {
-  state.scheme = e.target.value;
-  saveStorage("breach-scheme", state.scheme);
+let draftBindings, listeningFor = null;
+function syncBindingLabels() {
+  $("movement-keys").replaceChildren(...["up", "left", "down", "right"].map(action => {
+    const key = document.createElement("kbd");
+    key.textContent = keyLabel(state.bindings[action]);
+    return key;
+  }));
+  $("reload-key").textContent = keyLabel(state.bindings.reload);
+  document.querySelectorAll("[data-order]").forEach(button => {
+    const key = keyLabel(state.bindings[button.dataset.order]);
+    button.querySelector("span").textContent = key;
+    button.title = `${ACTIONS[button.dataset.order]} (${key})`;
+  });
+}
+function renderBindings() {
+  $("binding-list").replaceChildren(...Object.entries(ACTIONS).map(([action, label]) => {
+    const row = document.createElement("div");
+    row.className = "binding-row";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.binding = action;
+    button.textContent = listeningFor === action ? "Press a key…" : keyLabel(draftBindings[action]);
+    button.setAttribute("aria-label", `${label}: ${button.textContent}`);
+    button.classList.toggle("listening", listeningFor === action);
+    button.addEventListener("click", () => {
+      listeningFor = action;
+      renderBindings();
+      $("binding-status").textContent = "Press a key, or Escape to cancel this assignment.";
+      $("binding-list").querySelector(`[data-binding="${action}"]`).focus();
+    });
+    row.append(name, button);
+    return row;
+  }));
+  const error = bindingError(draftBindings);
+  $("binding-status").textContent = error || "";
+  $("save-bindings").disabled = !!error || !!listeningFor;
+}
+$("open-controls").addEventListener("click", () => {
   releaseInput();
-  document.querySelector(".control-item>div").replaceChildren(
-    ...(state.scheme === "edsf"
-      ? ["E", "D", "S", "F"]
-      : ["W", "A", "S", "D"]
-    ).map((key) => {
-      const k = document.createElement("kbd");
-      k.textContent = key;
-      return k;
-    }),
-  );
+  draftBindings = {...state.bindings};
+  listeningFor = null;
+  renderBindings();
+  $("controls-dialog").showModal();
 });
-$("control-scheme").dispatchEvent(new Event("change"));
+$("controls-dialog").addEventListener("keydown", event => {
+  if (!listeningFor) return;
+  // Tab retains native dialog navigation. Modifiers never become game bindings.
+  if (event.code === "Tab") return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.repeat) return;
+  const action = listeningFor;
+  if (event.code !== "Escape") {
+    if (event.ctrlKey || event.metaKey || event.altKey || !supportedKey(event.code)) {
+      $("binding-status").textContent = "Choose a letter, number, arrow, space or punctuation key.";
+      return;
+    }
+    draftBindings[action] = event.code;
+  }
+  listeningFor = null;
+  renderBindings();
+  $("binding-list").querySelector(`[data-binding="${action}"]`).focus();
+});
+$("cancel-bindings").addEventListener("click", () => $("controls-dialog").close());
+$("reset-bindings").addEventListener("click", () => {
+  draftBindings = {...DEFAULT_BINDINGS};
+  listeningFor = null;
+  renderBindings();
+});
+$("save-bindings").addEventListener("click", () => {
+  if (listeningFor || bindingError(draftBindings)) return;
+  state.bindings = {...draftBindings};
+  const saved = saveStorage(STORAGE_KEY, JSON.stringify(state.bindings));
+  syncBindingLabels();
+  $("controls-dialog").close();
+  notify(saved ? "Controls saved in this browser." : "Controls applied for this visit. Browser storage is unavailable.");
+});
+$("controls-dialog").addEventListener("close", () => {
+  listeningFor = null;
+  releaseInput();
+  if (phase() === "playing") canvas.focus({preventScroll: true});
+});
+syncBindingLabels();
 $("chat-form").addEventListener("submit", (e) => {
   e.preventDefault();
   const input = $("chat-input"),
@@ -594,8 +664,8 @@ function receiveSnapshot(game) {
         : me.reload_ms > 0
           ? "RELOADING…"
           : me.ammo === 0
-            ? "EMPTY / PRESS R"
-            : "R TO RELOAD");
+            ? `EMPTY / PRESS ${keyLabel(state.bindings.reload)}`
+            : `${keyLabel(state.bindings.reload)} TO RELOAD`);
     setText($("ammo-label"), me.hp <= 0 ? "SPECTATING SQUAD" : "CARBINE / 5.56");
 
     state.lastAmmo = me.ammo;
@@ -634,7 +704,8 @@ function receiveSnapshot(game) {
 }
 function inputFocused() {
   return (
-    ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName) ||
+    $("controls-dialog").open ||
+    ["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].includes(document.activeElement?.tagName) ||
     document.activeElement?.isContentEditable
   );
 }
@@ -655,35 +726,23 @@ function releaseInput() {
 }
 window.addEventListener("keydown", (event) => {
   if (inputFocused() || event.ctrlKey || event.metaKey || event.altKey) return;
-  const key = event.key.toLowerCase();
-  if (
-    ["1", "2", "3", "4"].includes(key) &&
-    phase() === "playing" &&
-    !state.game?.spectator &&
-    !event.repeat
-  ) {
+  const key = event.code;
+  const order = ["hold", "form_up", "aggro", "auto"].find(action => state.bindings[action] === key);
+  if (order && phase() === "playing" && !state.game?.spectator && !event.repeat) {
     event.preventDefault();
-    action("order", {
-      order: ["hold", "form_up", "aggro", "auto"][Number(key) - 1],
-    });
+    action("order", {order});
     return;
   }
-  if (
-    (state.scheme === "edsf"
-      ? ["e", "d", "s", "f", "r"]
-      : ["w", "a", "s", "d", "r"]
-    ).includes(key)
-  ) {
+  if (["up", "left", "down", "right", "reload"].some(action => state.bindings[action] === key)) {
     if (phase() === "playing") event.preventDefault();
     const wasHeld = state.keys.has(key);
     state.keys.add(key);
-    if (key === "r" && !event.repeat) state.reload = true;
+    if (key === state.bindings.reload && !event.repeat) state.reload = true;
     if (!event.repeat && !wasHeld) sendInput();
   }
 });
-window.addEventListener("keyup", (event) => {
-  const key = event.key.toLowerCase();
-  if (state.keys.delete(key) && key !== "r") sendInput();
+window.addEventListener("keyup", event => {
+  if (state.keys.delete(event.code) && event.code !== state.bindings.reload) sendInput();
 });
 window.addEventListener("blur", releaseInput);
 document.addEventListener("visibilitychange", () => {
@@ -722,12 +781,7 @@ function updateAim(origin = state.displayedLocal) {
   state.aim = aimAt(me, state.mouse, state.aim);
 }
 function movement() {
-  const k = state.keys,
-    edsf = state.scheme === "edsf";
-  return {
-    x: Number(k.has(edsf ? "f" : "d")) - Number(k.has(edsf ? "s" : "a")),
-    y: Number(k.has(edsf ? "d" : "s")) - Number(k.has(edsf ? "e" : "w")),
-  };
+  return movementFor(state.keys, state.bindings);
 }
 function emitWeaponFeedback(now) {
   const id = weapon.fire(now, state.shoot, state.reload);
@@ -810,7 +864,7 @@ $("sound-volume").addEventListener("input", (event) => {
 });
 window.addEventListener("pointerdown", unlockAudio);
 window.addEventListener("keydown", unlockAudio);
-// Only server-authorized audible events create sound. Never infer hidden enemy actions.
+// Local gun feedback and server-authorised audible events create sound. Never infer hidden enemy actions.
 // Server distance gain is listener-specific; wall occlusion also adds a low-pass filter.
 function playEventSound(event, listener, game) {
   if (

@@ -4,7 +4,7 @@
 
 Execute in this order; keep the README aligned with the shipped behaviour.
 
-- [ ] Audit README claims; replace the movement preset selector with a keybindings dialog saved to Local Storage.
+- [x] Audit README claims; replace the movement preset selector with a keybindings dialog saved to Local Storage.
 - [ ] Audit confusing UI labels, states and actions; make the next step clear for hosts, guests and reconnecting players.
 - [ ] Show reloading operators with a visible circular indicator.
 - [ ] Remove standby fireteam and inactive chat from the initial page.

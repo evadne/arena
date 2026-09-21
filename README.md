@@ -19,7 +19,8 @@ For another machine on your LAN, use the host machine's LAN address and port 400
 
 ## Controls
 
-- **WASD** movement, or select **EDSF** (E up, D down, S left, F right).
+- Open **Controls** to change movement, reload and squad-order keys. Select a binding, press a key and choose **Save controls**. Bindings are saved in this browser's Local Storage; defaults are listed below. Existing EDSF preferences are retained on upgrade. The dialog stops your input but does not pause the mission.
+- **WASD** movement by default. Bindings use physical keyboard positions.
 - **Mouse** aim. Your laser stays visible and stops at walls.
 - **Left mouse button** fire; hold for repeated shots.
 - **R** reload a 20-round magazine. Reserve ammunition is unlimited.
