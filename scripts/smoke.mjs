@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // End-to-end Phoenix Channels checks; Node >= 22, no npm dependencies.
 import assert from 'node:assert/strict';
+import { FrameDecoder } from '../priv/static/assets/frame_decoder.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const base = process.env.ARENA_URL || 'http://localhost:4000';
@@ -18,12 +19,23 @@ class Client {
     this.joinRef = null;
     this.pending = new Map();
     this.messages = [];
+    this.decoder = new FrameDecoder();
     this.socket = new WebSocket(url);
     this.socket.addEventListener('message', ({ data }) => {
       const [joinRef, ref, topic, event, payload] = JSON.parse(data);
       this.messages.push({ joinRef, ref, topic, event, payload });
-      if (event === 'lobby') this.lobby = payload;
-      if (event === 'snapshot') this.game = payload;
+      if (event === 'lobby') {
+        this.lobby = payload;
+        if (payload.status === 'waiting') this.decoder.reset();
+      }
+      if (event === 'frame') {
+        const result = this.decoder.apply(payload);
+        if (result.status === 'applied') {
+          this.game = result.snapshot;
+          this.send('frame_ack', {seq: result.seq});
+        } else if (result.status === 'resync') this.send('frame_resync', {});
+      }
+      if (event === 'snapshot') this.game = payload.map ? payload : { ...payload, map: this.game?.map };
       if (event === 'phx_reply' && this.pending.has(ref)) {
         const { resolve, timer } = this.pending.get(ref);
         clearTimeout(timer);
@@ -39,7 +51,7 @@ class Client {
       this.socket.addEventListener('open', () => { clearTimeout(timer); resolve(); }, { once: true });
       this.socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error(`Cannot connect to ${url}. Start mix phx.server first.`)); }, { once: true });
     });
-    const reply = await this.push('phx_join', { name: this.name });
+    const reply = await this.push('phx_join', { name: this.name, protocol: 3 });
     if (reply.status === 'ok') {
       this.id = reply.response.user_id;
       this.lobby = reply.response.lobby;
@@ -144,6 +156,7 @@ try {
 
   ok(await second.push('start'), 'leader launch');
   await until(() => first.game?.status === 'playing', 'mission snapshot');
+  assert(first.messages.some(m => m.event === 'frame'), 'protocol 3 acknowledged frames are active');
   const initial = structuredClone(first.game);
   assert.equal(initial.players.length, 4);
   assert.equal(initial.players.filter(player => player.bot).length, 2);

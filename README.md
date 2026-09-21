@@ -41,6 +41,8 @@ mix test
 mix format --check-formatted
 # With the server running; requires Node 24:
 node scripts/smoke.mjs
+node --test scripts/*.test.mjs
+ARENA_PROTOCOL=3 node scripts/network_probe.mjs
 ```
 
 See [architecture and design sources](docs/architecture.md) and the [wire protocol](docs/protocol.md).

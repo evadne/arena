@@ -1,4 +1,11 @@
 import { Socket } from "./phoenix.mjs";
+import { SnapshotBuffer, mergeSnapshotMap, interpolateActor } from "./snapshot_buffer.mjs";
+
+import { FrameDecoder } from "./frame_decoder.mjs";
+
+const snapshots = new SnapshotBuffer();
+const frames = new FrameDecoder();
+let frameResyncPending = false;
 
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -7,8 +14,7 @@ const state = {
   userId: null,
   lobby: null,
   game: null,
-  previous: null,
-  snapshotAt: 0,
+  fogCells: [],
   connected: false,
   joining: false,
   keys: new Set(),
@@ -107,19 +113,33 @@ function join(code) {
     if (state.socket === socket) setConnection(false, "RECONNECTING");
   });
   socket.connect();
-  const channel = socket.channel(`lobby:${code}`, { name });
+  const channel = socket.channel(`lobby:${code}`, { name, protocol: 3 });
   state.channel = channel;
   channel.on("lobby", (lobby) => {
     state.lobby = lobby;
     if (lobby.status === "waiting") {
       state.game = null;
-      state.previous = null;
+      frames.reset();
+      frameResyncPending = false;
+      snapshots.clear();
       state.shots.clear();
     }
     renderRoster();
     updateUI();
   });
   channel.on("snapshot", receiveSnapshot);
+  channel.on("frame", (frame) => {
+    if (state.channel !== channel) return;
+    const result = frames.apply(frame);
+    if (result.status === "applied") {
+      frameResyncPending = false;
+      receiveSnapshot(result.snapshot);
+      channel.push("frame_ack", { seq: result.seq });
+    } else if (result.status === "resync" && !frameResyncPending) {
+      frameResyncPending = true;
+      channel.push("frame_resync", {});
+    }
+  });
   channel.on("chat", addChat);
   channel.onError(() => {
     if (state.channel === channel) setConnection(false, "RECONNECTING");
@@ -135,7 +155,9 @@ function join(code) {
       state.userId = reply.user_id;
       state.lobby = reply.lobby;
       state.game = null;
-      state.previous = null;
+      frames.reset();
+      frameResyncPending = false;
+      snapshots.clear();
       state.shots.clear();
       state.lastAmmo = null;
       state.audioEvents.clear();
@@ -175,7 +197,9 @@ function disconnect(clearUrl = true) {
   state.userId = null;
   state.lobby = null;
   state.game = null;
-  state.previous = null;
+  frames.reset();
+  frameResyncPending = false;
+  snapshots.clear();
   state.connected = false;
   state.joining = false;
   state.shots.clear();
@@ -475,60 +499,76 @@ function formatTime(ms = 0) {
   const sec = Math.floor(ms / 1000);
   return `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
 }
+function setText(element, value) {
+  if (element.textContent !== value) element.textContent = value;
+}
+function setHTML(element, value) {
+  if (element.innerHTML !== value) element.innerHTML = value;
+}
 function receiveSnapshot(game) {
   if (!game) {
     state.game = null;
-    state.previous = null;
+    snapshots.clear();
     updateUI();
     renderRoster();
     return;
   }
   if (state.game?.seed !== game.seed || game.tick < (state.game?.tick || 0)) {
-    state.previous = null;
+    snapshots.clear();
     state.shots.clear();
     state.audioEvents.clear();
-  } else state.previous = state.game;
+  }
+  game = mergeSnapshotMap(game, state.game);
+  if (!game) return;
   state.game = game;
-  state.snapshotAt = performance.now();
+  snapshots.push(game, performance.now());
+  const visible = new Set((game.visible_tiles || []).map(([x, y]) => `${x},${y}`));
+  const explored = new Set((game.explored_tiles || []).map(([x, y]) => `${x},${y}`));
+  const size = game.map.tile_size;
+  const cells = game.map.floor_tiles || Array.from(
+    { length: Math.ceil(game.map.height / size) }, (_, y) => Array.from(
+      { length: Math.ceil(game.map.width / size) }, (_, x) => [x, y],
+    ),
+  ).flat();
+  state.fogCells = cells.map(([x, y]) => ({
+    x: x * size, y: y * size,
+    color: visible.has(`${x},${y}`) ? "#c9dc8910" : explored.has(`${x},${y}`) ? "#070f0a55" : "#060c08aa",
+  }));
   for (const shot of game.shots || [])
     if (!state.shots.has(shot.id))
       state.shots.set(shot.id, { ...shot, at: performance.now() });
   const me = game.players.find((p) => p.id === state.userId);
   if (me) {
-    $("hud-health").innerHTML =
-      `${Math.max(0, Math.ceil(me.hp))} <small>HP</small>`;
+    setHTML($("hud-health"), `${Math.max(0, Math.ceil(me.hp))} <small>HP</small>`);
     $("hud-health-bar").style.width = `${Math.max(0, me.hp)}%`;
-    $("hud-ammo").innerHTML =
-      `${String(me.ammo).padStart(2, "0")} <small>/ ∞</small>`;
-    $("hud-reload").textContent =
+    setHTML($("hud-ammo"), `${String(me.ammo).padStart(2, "0")} <small>/ ∞</small>`);
+    setText($("hud-reload"),
       me.hp <= 0
         ? "OPERATOR DOWN"
         : me.reload_ms > 0
           ? "RELOADING…"
           : me.ammo === 0
             ? "EMPTY / PRESS R"
-            : "R TO RELOAD";
-    $("ammo-label").textContent =
-      me.hp <= 0 ? "SPECTATING SQUAD" : "CARBINE / 5.56";
+            : "R TO RELOAD");
+    setText($("ammo-label"), me.hp <= 0 ? "SPECTATING SQUAD" : "CARBINE / 5.56");
 
     state.lastAmmo = me.ammo;
   }
   game.players.forEach((p) => {
     const name = $(`operator-name-${p.slot}`);
     if (name) {
-      name.textContent = rosterName(
+      setText(name, rosterName(
         p.slot,
         state.lobby?.members?.find((m) => m.slot === p.slot),
         p,
-      );
+      ));
       name.title = name.textContent;
     }
     const el = $(`operator-status-${p.slot}`);
     if (el)
-      el.textContent =
-        p.hp > 0
+      setText(el, p.hp > 0
           ? `${Math.ceil(p.hp)} HP / ${p.bot ? "AI SUPPORT" : "ACTIVE"}`
-          : "OPERATOR DOWN";
+          : "OPERATOR DOWN");
   });
   for (const event of game.events || []) {
     if (!state.audioEvents.has(event.id)) {
@@ -538,8 +578,13 @@ function receiveSnapshot(game) {
   }
   if (state.audioEvents.size > 3000)
     state.audioEvents = new Set([...state.audioEvents].slice(-1000));
-  $("mission-clock").textContent = formatTime(game.elapsed_ms);
-  updateUI();
+  setText($("mission-clock"), formatTime(game.elapsed_ms));
+  const uiKey = [game.seed, game.status, game.spectator, game.order,
+    game.enemies_remaining, game.players.filter((p) => p.hp > 0).length].join("|");
+  if (state.snapshotUIKey !== uiKey) {
+    state.snapshotUIKey = uiKey;
+    updateUI();
+  }
 }
 function inputFocused() {
   return (
@@ -859,17 +904,6 @@ function rayEnd(x, y, angle, map, max = 850) {
   }
   return { x: x + dx * distance, y: y + dy * distance };
 }
-function interpolate(player, previous, t) {
-  if (!previous) return player;
-  let delta =
-    ((player.angle - previous.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
-  return {
-    ...player,
-    x: previous.x + (player.x - previous.x) * t,
-    y: previous.y + (player.y - previous.y) * t,
-    angle: previous.angle + delta * t,
-  };
-}
 function render(now) {
   resize();
   const game = state.game,
@@ -947,23 +981,9 @@ function render(now) {
   }
   // Team visibility is server-generated. Hidden enemies are absent from snapshots.
   if (game) {
-    const explored = new Set(
-        (game.explored_tiles || []).map(([x, y]) => `${x},${y}`),
-      ),
-      visible = new Set(
-        (game.visible_tiles || []).map(([x, y]) => `${x},${y}`),
-      );
-    const cells =
-      map.floor_tiles ||
-      Array.from({ length: Math.ceil(map.height / s) }, (_, y) =>
-        Array.from({ length: Math.ceil(map.width / s) }, (_, x) => [x, y]),
-      ).flat();
-    for (const [x, y] of cells) {
-      const key = `${x},${y}`;
-      if (!visible.has(key))
-        ctx.fillStyle = explored.has(key) ? "#070f0a55" : "#060c08aa";
-      else ctx.fillStyle = "#c9dc8910";
-      ctx.fillRect(x * s, y * s, s + 0.5, s + 0.5);
+    for (const cell of state.fogCells) {
+      ctx.fillStyle = cell.color;
+      ctx.fillRect(cell.x, cell.y, s + 0.5, s + 0.5);
     }
   }
   for (const wall of map.walls) {
@@ -1005,14 +1025,8 @@ function render(now) {
     ctx.restore();
   }
   if (game) {
-    const t = Math.min(1, (now - state.snapshotAt) / 50);
-    const players = game.players.map((p) =>
-      interpolate(
-        p,
-        state.previous?.players.find((old) => old.id === p.id),
-        t,
-      ),
-    );
+    const sample = snapshots.sample(now);
+    const players = game.players.map((p) => interpolateActor(p, sample, "players"));
     for (const player of players) {
       const me = player.id === state.userId,
         angle = me ? state.aim : player.angle;
@@ -1040,11 +1054,8 @@ function render(now) {
       drawOperator(player, angle, me, false);
     }
     for (const enemy of game.enemies || []) {
-      const p = interpolate(
-        enemy,
-        state.previous?.enemies.find((old) => old.id === enemy.id),
-        t,
-      );
+      // Membership always comes from the latest visibility-filtered snapshot.
+      const p = interpolateActor(enemy, sample, "enemies");
       drawOperator(p, p.angle, false, true);
     }
     for (const [id, shot] of state.shots) {

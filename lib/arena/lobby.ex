@@ -121,7 +121,14 @@ defmodule Arena.Lobby do
     state = %{state | game: game, status: game.status, inputs: cleared_inputs}
     Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, game})
     if changed, do: broadcast_lobby(state)
-    if game.status == "playing", do: Process.send_after(self(), :tick, @tick_ms)
+
+    if game.status == "playing" do
+      # Include computation in the 50ms budget instead of adding it to every tick.
+      # Only one timer is outstanding, so an overloaded lobby cannot build a backlog.
+      remaining = max(1, @tick_ms - (System.monotonic_time(:millisecond) - now))
+      Process.send_after(self(), :tick, remaining)
+    end
+
     {:noreply, state}
   end
 

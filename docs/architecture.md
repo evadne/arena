@@ -20,6 +20,12 @@ Team vision is shared for cooperative usability. The map blueprint remains visib
 
 KillHouse's [Door Kickers Alpha 4 notes](https://inthekillhouse.com/door-kickers-alpha-4/) describe visible trooper FOV bounds, patrol/investigation behavior, and a fix for corner cases where a unit could shoot an opponent it could not see. Those establish useful visibility and fairness targets for this implementation.
 
+## Snapshot transport and playback
+
+The simulation remains 20 Hz, and each tick schedules its successor using the remaining 50 ms budget so computation time does not add systematic drift. Input is sampled at 30 Hz with latched fire/reload edges. Protocol 3 sends an initial floorplan/keyframe and sparse deltas against an acknowledged baseline. Each Channel holds one unacknowledged frame and the latest pending state; updates are capped at 20 Hz and coalesced before encoding. The browser reconstructs authoritative snapshots and renders positions through a bounded 100 ms interpolation history, while applying visibility membership and death immediately.
+
+Valve's [Source Multiplayer Networking](https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking) describes delta compression and a 100 ms interpolation period. Its [latency-compensation paper](https://developer.valvesoftware.com/w/index.php?title=Latency_Compensating_Methods_in_Client%2FServer_In-game_Protocol_Design_and_Optimization&uselang=en) also discusses interpolation between timestamped states. We apply those principles to Phoenix's reliable WebSocket transport. This prototype does not implement Source's UDP protocol, movement prediction, or server rewind. One outstanding frame bounds application backpressure but limits delivered update frequency to roughly one round-trip on high-latency paths. Cosmetic sounds/tracers older than their short retention window may be dropped during stalls rather than replayed as a burst.
+
 ## Fair AI design
 
 Daniel Brewer's GDC 2012 [Building Better Baddies slides](https://media.gdcvault.com/gdc2012/slides/Summit_AI/Brewer_Daniel_D2AIPostMortem.pdf), especially pages 3–5, describe cone-based sight, attenuated hearing, remembered positions and delayed reactions. These are primary-source slide notes, not a transcript. We apply the principles as the following design requirements:
@@ -32,6 +38,10 @@ Daniel Brewer's GDC 2012 [Building Better Baddies slides](https://media.gdcvault
 - Friendly bots navigate around walls and engage visible targets with the same weapon and reload constraints. Their aim is deliberately imperfect, so human operators retain a meaningful combat role. Any living human may issue Hold, Form up, Aggro or Auto orders during a mission; the shared order is broadcast to the squad. Spectators cannot issue orders. Hold keeps bots at their assigned positions, Form up gathers them around the requesting operator, Aggro advances them through the known premises, and Auto combines normal squad support with autonomous room clearing when no human survives.
 
 The implementation is a compact state machine suitable for this prototype, not the behavior-tree, coordination or collision-avoidance system demonstrated by the GDC speaker. See the engine tests for specific invariants and `docs/protocol.md` for the transport contract.
+
+## Balance measurement
+
+`mix run --no-start scripts/balance.exs 12 180` runs deterministic three-minute missions with an idle human plus three Aggro bots, and with a dead human plus three Auto bots. The September balance pass aligns bot engagement range with enemies (360 pixels) and lets guards retain acquisition readiness for 800 ms after losing sight, without firing through walls or tracking hidden positions. Human weapon handling is unchanged. In the twelve-seed idle-human benchmark, autonomous clears went from 1 to 0, losses from 6 to 10, and mean enemy kills from 13.92 to 8.58. This is a repeatable regression sample, not a guarantee that bots can never win or a substitute for human playtesting.
 
 ## Verification
 

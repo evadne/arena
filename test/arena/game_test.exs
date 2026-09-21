@@ -120,6 +120,80 @@ defmodule Arena.GameTest do
     assert hd(game.shots).x2 == 320.0
   end
 
+  test "human trigger remains immediate with unchanged damage and fire rate" do
+    game =
+      base()
+      |> wall_arena()
+      |> set_player(0, %{x: 80.0, y: 160.0, angle: 0.0})
+      |> set_enemy(0, %{x: 180.0, y: 160.0})
+
+    trigger = %{"user-0" => %{aim: 0.0, shoot: true}}
+    first = Game.step(game, trigger)
+    assert hd(first.players).ammo == 19
+    assert hd(first.players).cooldown_ms == 180
+    assert hd(first.enemies).hp == 66
+    before_next = Enum.reduce(1..3, first, fn _, state -> Game.step(state, trigger) end)
+    assert hd(before_next.players).ammo == 19
+    assert hd(Game.step(before_next, trigger).players).ammo == 18
+  end
+
+  test "bots need time to acquire a visible target and obey the weapon cooldown" do
+    game =
+      Game.new([hd(humans())], 7)
+      |> wall_arena()
+      |> set_player(1, %{x: 80.0, y: 160.0, angle: 0.0})
+      |> set_player(2, %{hp: 0})
+      |> set_player(3, %{hp: 0})
+      |> set_enemy(0, %{x: 220.0, y: 160.0, angle: 0.0, reaction_delay: 10_000})
+
+    before_acquisition = Enum.reduce(1..6, game, fn _, state -> Game.step(state, %{}) end)
+    assert Enum.at(before_acquisition.players, 1).ammo == 20
+    first = Game.step(before_acquisition, %{})
+    assert Enum.at(first.players, 1).ammo == 19
+    assert Enum.at(first.players, 1).cooldown_ms == 180
+    pause = Enum.reduce(1..3, first, fn _, state -> Game.step(state, %{}) end)
+    assert Enum.at(pause.players, 1).ammo == 19
+    assert Enum.at(Game.step(pause, %{}).players, 1).ammo == 18
+  end
+
+  test "bots cannot acquire enemies beyond the enemy engagement range" do
+    game =
+      Game.new([hd(humans())], 7)
+      |> wall_arena()
+      |> set_player(0, %{hp: 0})
+      |> set_player(1, %{x: 400.0, y: 160.0, angle: 0.0})
+      |> set_player(2, %{hp: 0})
+      |> set_player(3, %{hp: 0})
+      |> set_enemy(0, %{x: 780.0, y: 160.0, angle: :math.pi()})
+
+    game = %{game | enemies: Enum.take(game.enemies, 1)}
+    assert Game.sees?(game.map, Enum.at(game.players, 1), {780.0, 160.0})
+    next = Game.step(game, %{})
+    assert Enum.at(next.players, 1).aim_target == nil
+    assert Enum.at(next.players, 1).ammo == 20
+    assert hd(next.enemies).target_id == nil
+  end
+
+  test "an alerted enemy retains acquisition through a brief occlusion without firing blind" do
+    game =
+      base()
+      |> wall_arena()
+      |> set_player(0, %{x: 80.0, y: 160.0})
+      |> set_player(1, %{hp: 0})
+      |> set_player(2, %{hp: 0})
+      |> set_player(3, %{hp: 0})
+      |> set_enemy(0, %{x: 220.0, y: 160.0, angle: :math.pi()})
+
+    engaged = Enum.reduce(1..13, game, fn _, state -> Game.step(state, %{}) end)
+    assert hd(engaged.enemies).ammo == 19
+    hidden = set_player(engaged, 0, %{x: 420.0, y: 160.0})
+    hidden = Enum.reduce(1..4, hidden, fn _, state -> Game.step(state, %{}) end)
+    assert hd(hidden.enemies).ammo == 19
+    assert hd(hidden.enemies).memory == {80.0, 160.0}
+    returned = hidden |> set_player(0, %{x: 80.0, y: 160.0}) |> Game.step(%{})
+    assert hd(returned.enemies).ammo == 18
+  end
+
   test "20 round magazines reload indefinitely and a partial reload is timed" do
     game = base() |> wall_arena() |> set_player(0, %{ammo: 1, angle: -1.57})
     game = Game.step(game, %{"user-0" => %{aim: -1.57, shoot: true}})

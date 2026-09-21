@@ -356,7 +356,7 @@ defmodule Arena.Game do
     }
 
     targets =
-      Enum.filter(game.enemies, &(&1.hp > 0 and sees?(game.map, player, pos(&1), 410, 1.15, 65)))
+      Enum.filter(game.enemies, &(&1.hp > 0 and sees?(game.map, player, pos(&1), 360, 1.15, 65)))
 
     target = Enum.min_by(targets, &distance(pos(player), pos(&1)), fn -> nil end)
 
@@ -555,7 +555,13 @@ defmodule Arena.Game do
           do: %{enemy | memory: {heard.x1, heard.y1}, memory_at: game.elapsed_ms},
           else: enemy
 
-      enemy = %{enemy | target_id: nil, reaction_ms: 0}
+      # A brief occlusion does not make an already alerted guard forget how to shoot.
+      # This retains only acquisition readiness; positions still come from sight/sound.
+      enemy =
+        if game.elapsed_ms - enemy.memory_at <= 800,
+          do: enemy,
+          else: %{enemy | target_id: nil, reaction_ms: 0}
+
       remembered? = enemy.memory != nil and game.elapsed_ms - enemy.memory_at < 6000
       goal = if remembered?, do: enemy.memory, else: patrol_goal(enemy, game)
       {enemy, {dx, dy}} = navigate(enemy, goal, game.map, 15)
