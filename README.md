@@ -45,7 +45,7 @@ node --test scripts/*.test.mjs
 ARENA_PROTOCOL=3 node scripts/network_probe.mjs
 ```
 
-See [architecture and design sources](docs/architecture.md) and the [wire protocol](docs/protocol.md).
+See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md).
 
 ## Deployment notes and limits
 
