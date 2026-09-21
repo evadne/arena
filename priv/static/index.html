@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#080e0c" />
+    <title>BREACH — Cooperative Tactical Operations</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas
+          id="game-canvas"
+          tabindex="0"
+          aria-label="Tactical map. Use WASD or EDSF to move, mouse to aim, left click to fire, and R to reload."
+        ></canvas>
+        <div class="scene-vignette"></div>
+        <div class="scene-grain"></div>
+        <div class="map-compass"><span>N</span><span>↑</span></div>
+        <div class="map-coordinates">
+          FACILITY / UNKNOWN<br />RECON FEED — LIVE
+        </div>
+        <div class="map-bottom-note" id="map-bottom-note">
+          <span>PROCEDURAL FACILITY</span><span>NO TWO ENTRIES ALIKE.</span>
+        </div>
+      </div>
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Breach home"
+          ><span class="brand-mark"><i></i><i></i><i></i></span>BREACH<span
+            class="build-number"
+            >/ 001</span
+          ></a
+        >
+        <div id="session-panel" hidden>
+          <div class="session-code">
+            <span>OP</span><strong id="session-code">—</strong
+            ><button
+              class="icon-button"
+              id="copy-invite"
+              title="Copy invitation link"
+            >
+              INVITE +
+            </button>
+          </div>
+          <button class="text-button" id="leave-lobby">LEAVE ↗</button>
+        </div>
+        <div class="header-meta">
+          <span class="connection" id="connection"><i></i>OFFLINE</span
+          ><button
+            class="icon-button"
+            id="sound-toggle"
+            aria-label="Mute sound"
+            title="Toggle sound"
+            aria-pressed="true"
+          >
+            SOUND ON</button
+          ><label class="volume-control" title="Sound volume"
+            ><input
+              type="range"
+              id="sound-volume"
+              min="0"
+              max="100"
+              value="50"
+              aria-label="Sound volume"
+          /></label>
+        </div>
+      </header>
+      <section class="staging-content">
+        <div class="briefing" id="briefing">
+          <div class="briefing-tag">
+            <span class="signal-bars">▂▄▆</span> COOPERATIVE TACTICAL SHOOTER
+          </div>
+          <h1>BREACH<span class="title-period">.</span></h1>
+          <div class="briefing-subtitle">
+            <span>GET IN.</span><span>CLEAR THE ROOM.</span
+            ><span>GET HOME.</span>
+          </div>
+          <p>
+            Four operators against the unknown.<br />Move together. Watch every
+            angle.
+          </p>
+        </div>
+        <div class="operation-controls">
+          <div id="entry-panel">
+            <label for="player-name">01 / IDENTIFY YOURSELF</label
+            ><input
+              id="player-name"
+              maxlength="20"
+              placeholder="YOUR CALLSIGN"
+              autocomplete="nickname"
+            /><button class="primary" id="create-lobby">
+              NEW OPERATION <span>↗</span>
+            </button>
+            <form id="join-form" class="join-row">
+              <input
+                id="lobby-code"
+                aria-label="Operation code"
+                maxlength="12"
+                placeholder="HAVE AN OPERATION CODE?"
+                autocomplete="off"
+              /><button class="secondary" type="submit">JOIN →</button>
+            </form>
+          </div>
+        </div>
+      </section>
+      <section class="squad-panel">
+        <div class="squad-heading">
+          <h2>FIRETEAM <span id="squad-count">0 / 4</span></h2>
+          <span class="tiny-label" id="lobby-state">STANDBY</span>
+        </div>
+        <div id="roster" class="roster"></div>
+        <div class="squad-bottom">
+          <div
+            class="formation-options"
+            id="formations"
+            aria-label="AI teammate formation"
+          >
+            <span class="formation-label">FORMATION</span
+            ><button data-formation="stack" class="selected">
+              <span class="formation-icon">⋮</span>STACK</button
+            ><button data-formation="wedge">
+              <span class="formation-icon">∴</span>WEDGE</button
+            ><button data-formation="line">
+              <span class="formation-icon">···</span>LINE
+            </button>
+          </div>
+          <p class="helper">Empty slots filled by AI.</p>
+        </div>
+      </section>
+      <section class="comms-panel">
+        <div class="comms-heading">
+          <h2><span class="comms-dot"></span>SQUAD FREQUENCY</h2>
+          <span>ENCRYPTED</span>
+        </div>
+        <div class="chat-log" id="chat-log" role="log" aria-live="polite">
+          <div class="chat-empty">Connect to establish squad comms.</div>
+        </div>
+        <form id="chat-form">
+          <input
+            id="chat-input"
+            placeholder="Message your squad…"
+            maxlength="240"
+            aria-label="Chat message"
+            disabled
+          /><button type="submit" aria-label="Send message" disabled>↵</button>
+        </form>
+      </section>
+      <div class="map-toolbar">
+        <div class="mission-heading">
+          <span class="live-dot"></span
+          ><strong id="map-title">TACTICAL OVERVIEW</strong
+          ><span class="map-subtitle" id="map-subtitle"
+            >PROCEDURAL FACILITY</span
+          >
+        </div>
+        <span id="mission-clock">00:00</span
+        ><span id="map-scale" hidden>TOP DOWN</span>
+      </div>
+      <div class="deployment-bar">
+        <div class="deployment-info">
+          <h3 id="mission-status">Ready when you are.</h3>
+          <p id="mission-description">
+            Create an operation to assemble your team.
+          </p>
+        </div>
+        <button class="primary deploy-button" id="start-game" disabled>
+          DEPLOY SQUAD <span>↗</span>
+        </button>
+      </div>
+      <div
+        class="command-strip"
+        id="command-strip"
+        aria-label="Teammate orders"
+        hidden
+      >
+        <button data-order="hold" title="Hold current positions (1)">
+          <span>1</span>HOLD</button
+        ><button data-order="form_up" title="Regroup in formation (2)">
+          <span>2</span>FORM UP</button
+        ><button data-order="aggro" title="Aggressive clearing (3)">
+          <span>3</span>AGGRO</button
+        ><button
+          data-order="auto"
+          class="selected"
+          title="Autonomous room clearing (4)"
+        >
+          <span>4</span>AUTO
+        </button>
+      </div>
+      <div class="player-hud" id="player-hud" hidden>
+        <div class="hud-vitals">
+          <span class="hud-label">VITALS</span
+          ><strong id="hud-health">100 <small>HP</small></strong>
+          <div class="health-bar"><i id="hud-health-bar"></i></div>
+        </div>
+        <div class="hud-ammo">
+          <span class="hud-label" id="ammo-label">CARBINE / 5.56</span
+          ><strong id="hud-ammo">20 <small>/ ∞</small></strong
+          ><span class="hud-reload" id="hud-reload">R TO RELOAD</span>
+        </div>
+      </div>
+      <div class="end-screen" id="end-screen" hidden>
+        <div class="briefing-tag" id="end-label">OPERATION COMPLETE</div>
+        <h2 id="end-title">Facility secured.</h2>
+        <p id="end-description"></p>
+        <button class="primary" id="play-again">RETURN TO BRIEFING ↗</button>
+      </div>
+      <div
+        id="notice"
+        class="notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+      <section class="field-guide" aria-label="Game controls">
+        <div class="control-item">
+          <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div>
+          <label class="select-label"
+            ><select id="control-scheme" aria-label="Movement key layout">
+              <option value="wasd">WASD movement</option>
+              <option value="edsf">EDSF movement</option>
+            </select></label
+          >
+        </div>
+        <span><b>MOUSE</b> AIM + FIRE</span><span><kbd>R</kbd> RELOAD</span
+        ><span class="guide-objective"
+          >04 OPERATORS <i>/</i> 16–32 HOSTILES</span
+        >
+      </section>
+    </main>
+    <script type="module" src="/assets/app.js"></script>
+  </body>
+</html>

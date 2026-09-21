@@ -1,0 +1,7 @@
+/_build/
+/deps/
+/node_modules/
+/erl_crash.dump
+/.DS_Store
+/artifacts/
+.env
