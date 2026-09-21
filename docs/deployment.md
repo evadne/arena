@@ -60,3 +60,34 @@ docker run --rm -p 4000:4000 -e SECRET_KEY_BASE -e HOST=localhost arena:local
 ```
 
 In another terminal, check `curl --fail http://localhost:4000/health`. The production socket origin configuration assumes HTTPS, so use the normal development server for browser gameplay on plain localhost, or provide a local HTTPS proxy for a complete production-origin test. Run `unset SECRET_KEY_BASE` after stopping the container.
+
+## Prepared responsiveness release — 21 September 2026
+
+`flyctl apps list` confirmed `evadne-arena` in the personal organisation. Strict configuration validation passed and `SECRET_KEY_BASE` is deployed. The production target remains one Machine, `84ed543c26ed78`, in `lhr`, using `shared-cpu-2x:1024MB`.
+
+The responsiveness changes at source commit `c01c8c02740475351fd8c6b13ae48a0e55c89fc3` were built remotely with flyctl and pushed using `--build-only --push`. The 35 MB image includes the production Elixir release and carries the source revision as an OCI label:
+
+- Tag: `registry.fly.io/evadne-arena:commit-c01c8c027404`
+- Immutable image: `registry.fly.io/evadne-arena@sha256:dddc2e6acd5df59b8d48b4141a2f93987da6748630cc1be3db471edf0287ce08`
+
+The image is prepared, **not deployed**. The existing Machine remained at version 6, on `registry.fly.io/evadne-arena:deployment-01M32PEBVC2K3CQE1W1G8Q2BCY`, with its health check passing and `/health` returning `ok` after the build. Source verification before preparation passed 60 server tests, 35 client tests and the local socket smoke suite; production gameplay verification is still required after rollout.
+
+Deploy the prepared image without rebuilding:
+
+```sh
+flyctl deploy --app evadne-arena --ha=false \
+  --image registry.fly.io/evadne-arena@sha256:dddc2e6acd5df59b8d48b4141a2f93987da6748630cc1be3db471edf0287ce08
+flyctl machine list --app evadne-arena
+flyctl checks list --app evadne-arena
+ARENA_URL=https://evadne-arena.fly.dev node scripts/smoke.mjs
+ARENA_URL=https://evadne-arena.fly.dev ARENA_PROTOCOL=3 node scripts/network_probe.mjs
+```
+
+The configured immediate deployment replaces the sole lobby owner and ends active in-memory sessions. Refresh browser tabs after rollout to load the new prediction and weapon-feedback code.
+
+If rollback is required, the previously running image is:
+
+```sh
+flyctl deploy --app evadne-arena --ha=false \
+  --image registry.fly.io/evadne-arena:deployment-01M32PEBVC2K3CQE1W1G8Q2BCY
+```
