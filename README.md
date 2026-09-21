@@ -45,7 +45,7 @@ node --test scripts/*.test.mjs
 ARENA_PROTOCOL=3 node scripts/network_probe.mjs
 ```
 
-See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md). The [movement prediction investigation](docs/movement-prediction.md) describes proposed next steps; prediction is not enabled yet.
+See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md). The [movement prediction investigation](docs/movement-prediction.md) describes the enabled local forecasting and reconciliation.
 
 Deferred work, including hitscan lag compensation, is tracked in the [backlog](docs/backlog.md).
 

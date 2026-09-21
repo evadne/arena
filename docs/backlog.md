@@ -12,4 +12,4 @@ Shots currently intersect actors at their current authoritative server positions
 - Preserve fire-rate, ammo and reload authority. Clear history on round changes and bound memory and work per shot.
 - Verify moving-target hits and misses under controlled latency and jitter, cover transitions, death/round boundaries and invalid timing claims. Measure the benefit and maximum rewind before choosing the production cap.
 
-This is separate from the proposed [local movement prediction and reconciliation](movement-prediction.md). Neither feature is currently enabled.
+This is separate from the proposed [local movement prediction and reconciliation](movement-prediction.md). Local movement forecasting is enabled; hitscan compensation remains deferred.

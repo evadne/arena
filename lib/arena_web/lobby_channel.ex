@@ -41,6 +41,8 @@ defmodule ArenaWeb.LobbyChannel do
   end
 
   @impl true
+  def handle_in("ping", _, socket), do: {:reply, {:ok, %{}}, socket}
+
   def handle_in("input", payload, socket) do
     input = %{
       x: number(payload["x"], -1, 1),

@@ -17,9 +17,9 @@ export class SnapshotBuffer {
   push(snapshot, arrivalMs) {
     const time = snapshot.elapsed_ms;
     const previous = this.frames.at(-1);
-    if (snapshot.seed !== this.seed || (previous && time < previous.time))
+    if ((snapshot.round_id ?? snapshot.seed) !== this.seed || (previous && time < previous.time))
       this.clear();
-    this.seed = snapshot.seed;
+    this.seed = snapshot.round_id ?? snapshot.seed;
     const frame = {
       time,
       players: new Map(snapshot.players.map((actor) => [actor.id, actor])),

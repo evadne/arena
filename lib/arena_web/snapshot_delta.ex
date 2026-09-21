@@ -10,7 +10,8 @@ defmodule ArenaWeb.SnapshotDelta do
   @collections [:map, :players, :enemies, :visible_tiles, :explored_tiles, :shots, :events]
 
   def encode(current, baseline, seq, base_seq) do
-    if is_nil(baseline) or current.seed != baseline.seed do
+    if is_nil(baseline) or current.seed != baseline.seed or
+         Map.get(current, :round_id) != Map.get(baseline, :round_id) do
       %{seq: seq, base: nil, full: current}
     else
       %{seq: seq, base: base_seq}

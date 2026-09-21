@@ -82,6 +82,8 @@ defmodule Arena.Game do
 
     %{
       seed: seed,
+      round_id: System.unique_integer([:positive, :monotonic]),
+      controls: %{},
       status: "playing",
       tick: 0,
       elapsed_ms: 0,
@@ -203,7 +205,8 @@ defmodule Arena.Game do
         end
       end)
 
-    game = %{game | players: players}
+    controls = Map.new(inputs, fn {id, input} -> {id, Map.take(input, [:x, :y])} end)
+    game = %{game | players: players, controls: controls}
 
     game =
       Enum.reduce(players, game, fn p, state ->
@@ -658,6 +661,8 @@ defmodule Arena.Game do
 
     %{
       seed: game.seed,
+      round_id: game.round_id,
+      control: Map.get(game.controls, user_id, %{x: 0, y: 0}),
       status: game.status,
       order: game.order,
       tick: game.tick,

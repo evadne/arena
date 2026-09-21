@@ -1,11 +1,12 @@
 import { Socket } from "./phoenix.mjs";
 import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "./snapshot_buffer.mjs";
 
+import { MovementPrediction } from "./movement_prediction.mjs";
 import { FrameDecoder } from "./frame_decoder.mjs";
 import { inviteURL, inviteQRSvg } from "./invite_qr.mjs";
 
 const snapshots = new SnapshotBuffer();
-const localSnapshots = new SnapshotBuffer(50);
+const prediction = new MovementPrediction();
 const frames = new FrameDecoder();
 let frameResyncPending = false;
 
@@ -537,7 +538,7 @@ function setHTML(element, value) {
 }
 function clearPlayback() {
   snapshots.clear();
-  localSnapshots.clear();
+  prediction.reset();
   state.displayedLocal = null;
 }
 function receiveSnapshot(game) {
@@ -548,7 +549,7 @@ function receiveSnapshot(game) {
     renderRoster();
     return;
   }
-  if (state.game?.seed !== game.seed || game.tick < (state.game?.tick || 0)) {
+  if ((state.game?.round_id ?? state.game?.seed) !== (game.round_id ?? game.seed) || game.tick < (state.game?.tick || 0)) {
     clearPlayback();
     state.shots.clear();
     state.audioEvents.clear();
@@ -558,7 +559,7 @@ function receiveSnapshot(game) {
   state.game = game;
   const arrival = performance.now();
   snapshots.push(game, arrival);
-  localSnapshots.push(game, arrival);
+  prediction.accept(game, state.userId, arrival);
   const visible = new Set((game.visible_tiles || []).map(([x, y]) => `${x},${y}`));
   const explored = new Set((game.explored_tiles || []).map(([x, y]) => `${x},${y}`));
   const size = game.map.tile_size;
@@ -630,6 +631,7 @@ function inputFocused() {
   );
 }
 function releaseInput() {
+  prediction.suspend();
   state.keys.clear();
   state.shoot = false;
   state.reload = false;
@@ -667,7 +669,7 @@ window.addEventListener("keydown", (event) => {
     const wasHeld = state.keys.has(key);
     state.keys.add(key);
     if (key === "r" && !event.repeat) state.reload = true;
-    if (key !== "r" && !event.repeat && !wasHeld) sendInput();
+    if (!event.repeat && !wasHeld) sendInput();
   }
 });
 window.addEventListener("keyup", (event) => {
@@ -699,6 +701,7 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 window.addEventListener("pointerup", () => {
   state.shoot = false;
+  sendInput();
 });
 canvas.addEventListener("pointercancel", releaseInput);
 canvas.addEventListener("lostpointercapture", () => {
@@ -723,9 +726,12 @@ function sendInput() {
     phase() !== "playing" ||
     state.game?.spectator ||
     inputFocused() ||
-    document.hidden
+    document.hidden ||
+    !document.hasFocus()
   )
     return;
+  prediction.input(movement(), performance.now());
+  state.displayedLocal = prediction.sample(performance.now());
   updateAim();
   state.channel.push("input", {
     ...movement(),
@@ -736,6 +742,13 @@ function sendInput() {
   state.reload = false;
 }
 setInterval(sendInput, 1000 / 30);
+setInterval(() => {
+  if (!state.connected || document.hidden) return;
+  const channel = state.channel, start = performance.now();
+  channel.push("ping", {}, 2000).receive("ok", () => {
+    if (state.channel === channel) prediction.setRTT(performance.now() - start);
+  });
+}, 1000);
 function unlockAudio() {
   if (state.muted) return;
   const Audio = window.AudioContext || window.webkitAudioContext;
@@ -1064,10 +1077,9 @@ function render(now) {
   }
   if (game) {
     const sample = snapshots.sample(now);
-    const localSample = localSnapshots.sample(now);
-    const players = game.players.map((p) => interpolateActor(
-      p, p.id === state.userId ? localSample : sample, "players",
-    ));
+    const local = prediction.sample(now);
+    const players = game.players.map((p) => p.id === state.userId && local
+      ? local : interpolateActor(p, sample, "players"));
     state.displayedLocal = players.find((p) => p.id === state.userId) || null;
     updateAim();
     for (const player of players) {
