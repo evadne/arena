@@ -5,3 +5,6 @@
 /.DS_Store
 /artifacts/
 .env
+.env.*
+*.pem
+*.key
