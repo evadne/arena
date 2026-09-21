@@ -329,6 +329,7 @@ input:focus {
   border-bottom: 1px solid #58714c66;
   gap: 10px;
 }
+.join-row .primary { flex: none; padding: 12px; font-size: 9px; letter-spacing: 0.5px; }
 .join-row input {
   border: 0;
   background: transparent;
@@ -1647,4 +1648,101 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .has-invite .comms-panel {
     top: 1085px;
   }
+}
+
+/* Staging follows document flow: members, formation, deploy, then chat. */
+body.is-connected:not(.operation-active) { overflow: auto; }
+body.is-connected:not(.operation-active) .game-shell { height: auto; min-height: 100dvh; }
+body:not(.operation-active) .canvas-wrap { position: fixed; }
+.lobby-heading { margin-bottom: 24px; }
+.lobby-heading h1 { margin: 9px 0 0; font: 700 52px/1 var(--display); color: var(--bright); }
+body:not(.operation-active) .lobby-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 440px) minmax(220px, 280px);
+  justify-content: space-between;
+  align-items: start;
+  gap: 6vw;
+  padding: 105px 7vw 35px;
+}
+body:not(.operation-active) .lobby-main { min-width: 0; }
+body:not(.operation-active) .lobby-layout .squad-panel,
+body:not(.operation-active) .lobby-layout .deployment-bar,
+body:not(.operation-active) .lobby-layout .comms-panel,
+body:not(.operation-active) .lobby-layout .invite-qr {
+  position: static;
+  width: 100%;
+  max-width: none;
+  transform: none;
+}
+body:not(.operation-active) .lobby-layout .roster { flex-direction: column; }
+body:not(.operation-active) .lobby-layout .operator {
+  width: 100%;
+  padding: 12px 14px;
+  gap: 16px;
+  flex-wrap: nowrap;
+  border-right: 0;
+  border-bottom: 1px solid var(--line);
+  background: #0c1712b8;
+}
+body:not(.operation-active) .lobby-layout .operator:last-child { border-bottom: 0; }
+body:not(.operation-active) .lobby-layout .operator.self { background: #203222db; border-left: 2px solid #c1d99a; }
+body:not(.operation-active) .lobby-layout .operator.self:before { display: none; }
+body:not(.operation-active) .lobby-layout .operator-info { flex: 1; width: auto; order: 0; }
+body:not(.operation-active) .lobby-layout .operator-number { font-size: 24px; line-height: 26px; }
+body:not(.operation-active) .lobby-layout .operator-name { font-size: 12px; max-width: none; }
+body:not(.operation-active) .lobby-layout .operator-detail { font-size: 9px; color: #9eb48c; }
+body:not(.operation-active) .lobby-layout .operator-action {
+  font-size: 9px;
+  border: 1px solid #6f8e5f70;
+  padding: 9px;
+  flex: none;
+  margin: 0;
+}
+body:not(.operation-active) .lobby-layout .ai-badge { font-size: 9px; }
+body:not(.operation-active) .lobby-layout .squad-heading h2 { font-size: 11px; }
+body:not(.operation-active) .lobby-layout .squad-heading h2 span { font-size: 9px; margin-left: 10px; color: #9eb48c; }
+body:not(.operation-active) .lobby-layout .squad-bottom { display: block; margin: 18px 0 0; }
+body:not(.operation-active) .lobby-layout .formation-options { gap: 18px; flex-wrap: wrap; }
+body:not(.operation-active) .lobby-layout .formation-options button { font-size: 10px; padding: 4px 0; }
+body:not(.operation-active) .lobby-layout .formation-label { font-size: 8px; color: #91ab7c; }
+body:not(.operation-active) .lobby-layout .helper { display: block; font-size: 10px; color: #91ab7c; margin-top: 10px; }
+body:not(.operation-active) .lobby-layout .deployment-bar { display: block; margin-top: 24px; }
+body:not(.operation-active) .lobby-layout .deployment-info h3 { font-size: 20px; }
+body:not(.operation-active) .lobby-layout .deployment-info p { max-width: none; font-size: 11px; color: #a1b795; }
+body:not(.operation-active) .lobby-layout .deploy-button { width: 100%; margin-top: 16px; }
+body:not(.operation-active) .lobby-layout .comms-panel { margin-top: 24px; background: #08120bb8; padding: 0 14px 10px; }
+body:not(.operation-active) .lobby-layout .chat-log { height: 88px; }
+body:not(.operation-active) .lobby-layout .comms-heading h2 { font-size: 10px; }
+body:not(.operation-active) .lobby-layout .chat-message,
+body:not(.operation-active) .lobby-layout .comms-panel input { font-size: 11px; }
+body:not(.operation-active) .lobby-layout .comms-panel input::placeholder { font-size: 10px; color: #91ab7c; }
+body:not(.operation-active) .lobby-layout .invite-qr { padding: 20px; background: #0b1510e6; border: 1px solid var(--line); }
+body:not(.operation-active) .lobby-layout .invite-qr p { font-size: 10px; }
+body.is-connected:not(.operation-active) .field-guide { position: static; margin: 0 7vw; padding: 0 0 26px; }
+body.is-connected:not(.operation-active) .map-coordinates,
+body.is-connected:not(.operation-active) .map-bottom-note { display: none; }
+.operation-active .lobby-heading { display: none; }
+.operation-active .operator-action { font-size: 7px; }
+.operation-over .end-screen { max-height: calc(100dvh - 140px); overflow: auto; }
+.operation-over .end-screen .comms-panel {
+  display: block;
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin: 25px 0 0;
+  text-align: left;
+  transform: none;
+}
+.operation-over .end-screen .chat-log { height: 80px; }
+@media (max-width: 760px) {
+  body:not(.operation-active) .lobby-layout { grid-template-columns: minmax(0, 1fr); padding: 124px 6vw 28px; gap: 32px; }
+  body:not(.operation-active) .lobby-layout .invite-qr { width: min(100%, 300px); justify-self: center; }
+  body:not(.operation-active) .lobby-layout .operator { padding: 11px 10px; gap: 10px; }
+  body:not(.operation-active) .lobby-layout .operator-name { font-size: 11px; }
+  body:not(.operation-active) .lobby-layout .operator-action { padding: 8px 6px; font-size: 8px; }
+  body:not(.operation-active) .lobby-layout .squad-heading h2 span { font-size: 8px; }
+  body:not(.operation-active) .game-shell:has(#entry-panel:not([hidden])) { height: auto; min-height: 760px; }
+  body:not(.operation-active) .field-guide { flex-wrap: wrap; row-gap: 12px; }
+  .header-meta { gap: 12px; }
+  .operation-over .end-screen { max-height: calc(100dvh - 110px); }
 }

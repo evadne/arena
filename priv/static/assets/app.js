@@ -64,6 +64,10 @@ if (incomingCode) {
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 12);
   $("entry-help").textContent = `Invite to lobby ${$("lobby-code").value}. Enter your callsign, then choose Join lobby.`;
+  $("entry-panel").append($("create-lobby"));
+  $("create-lobby").className = "secondary";
+  $("create-lobby").textContent = "CREATE A DIFFERENT LOBBY";
+  document.querySelector("#join-form button").className = "primary";
 }
 function notify(message, error = false) {
   clearTimeout(noticeTimer);
@@ -219,6 +223,10 @@ function disconnect(clearUrl = true) {
     const url = new URL(location.href);
     url.searchParams.delete("lobby");
     history.replaceState({}, "", url);
+    $("entry-help").before($("create-lobby"));
+    $("create-lobby").className = "primary";
+    $("create-lobby").innerHTML = "CREATE LOBBY <span>↗</span>";
+    document.querySelector("#join-form button").className = "secondary";
   }
   $("entry-help").textContent = "Play solo with AI, or invite up to three friends.";
   $("chat-log").replaceChildren();
@@ -240,14 +248,16 @@ $("join-form").addEventListener("submit", (e) => {
   join($("lobby-code").value);
 });
 $("leave-lobby").addEventListener("click", () => disconnect());
-$("copy-invite").addEventListener("click", async () => {
+async function copyInvite() {
   try {
     await navigator.clipboard.writeText(inviteURL(location.href, state.lobby.code));
     notify("Invite link copied. Send it to your squad.");
   } catch {
     notify(`Invite code: ${state.lobby?.code}. Share this page’s address.`);
   }
-});
+}
+$("copy-invite").addEventListener("click", copyInvite);
+$("qr-copy-invite").addEventListener("click", copyInvite);
 $("start-game").addEventListener("click", () => {
   $("notice").hidden = true;
   clearTimeout(noticeTimer);
@@ -256,7 +266,7 @@ $("start-game").addEventListener("click", () => {
 $("play-again").addEventListener("click", () => action("reset"));
 $("command-strip").addEventListener("click", (event) => {
   const button = event.target.closest("[data-order]");
-  if (button) action("order", { order: button.dataset.order });
+  if (button) action("order", { order: button.dataset.order }, () => canvas.focus({preventScroll: true}));
 });
 $("formations").addEventListener("click", (e) => {
   const button = e.target.closest("button");
@@ -409,6 +419,7 @@ function renderRoster() {
     const player = state.game?.players?.find((p) => p.slot === slot);
     const row = document.createElement("div");
     row.className = `operator ${member ? "human" : ""} ${me ? "self" : ""}`;
+    row.setAttribute("role", "listitem");
     const number = document.createElement("span");
     number.className = "operator-number";
     number.textContent = String(slot + 1).padStart(2, "0");
@@ -441,7 +452,7 @@ function renderRoster() {
       b.title = `Move to slot ${slot + 1}`;
       b.addEventListener("click", () => action("slot", { slot }));
       row.append(b);
-    } else if (member && !me && isLeader()) {
+    } else if (member && !me && isLeader() && phase() === "waiting") {
       const b = document.createElement("button");
       b.className = "operator-action";
       b.textContent = "MAKE LEADER";
@@ -519,10 +530,16 @@ function updateUI() {
   }
   state.uiPhase = status;
   $("entry-panel").hidden = joined;
+  $("landing-content").hidden = joined;
+  $("lobby-layout").hidden = !joined;
+  const chatParent = over ? $("end-screen") : $("lobby-main");
+  if ($("comms-panel").parentElement !== chatParent) chatParent.append($("comms-panel"));
   $("squad-panel").hidden = !joined;
   $("comms-panel").hidden = !joined || playing;
   $("session-panel").hidden = !joined;
   $("session-code").textContent = state.lobby?.code || "—";
+  document.querySelector(".helper").textContent = leader ? "AI fills empty slots. You can deploy solo." : "AI fills any slots left empty.";
+  document.querySelectorAll(".operator-action").forEach(button => { button.disabled = !state.connected; });
   $("lobby-state").textContent = joined
     ? playing
       ? "ACTIVE"
@@ -576,7 +593,7 @@ function updateUI() {
         ? "All hostiles neutralised."
         : "Squad lost. Regroup and adapt."
       : joined
-        ? "Your operation is ready."
+        ? leader ? "Your operation is ready." : "Waiting for squad leader"
         : "Ready when you are.";
   $("mission-description").textContent = playing
     ? `${state.game?.enemies_remaining ?? "—"} hostiles remaining · ${state.game?.players?.filter((p) => p.hp > 0).length ?? 4} operators standing`
@@ -585,7 +602,7 @@ function updateUI() {
       : joined
         ? leader
           ? "Invite friends, choose a formation, then deploy. AI fills any empty slots."
-          : `${state.lobby.members.find(m => m.id === state.lobby.leader_id)?.name || "Your leader"} will deploy the squad. You can choose an empty slot below.`
+          : `${state.lobby.members.find(m => m.id === state.lobby.leader_id)?.name || "Your leader"} will deploy the squad. You can choose an empty slot in the fireteam list.`
         : "Create an operation to assemble your team.";
   if (joined && !state.connected) {
     $("mission-status").textContent = "Connection interrupted";
@@ -606,7 +623,7 @@ function updateUI() {
       status === "won" ? "Facility secured." : "Squad down.";
     $("end-description").textContent =
       status === "won"
-        ? `${state.game.enemies_total ? `${state.game.enemies_total} hostiles` : "All hostiles"} neutralized in ${formatTime(state.game.elapsed_ms)}. ${state.game.players.filter((p) => p.hp > 0).length} operators survived.`
+        ? `${state.game.enemies_total ? `${state.game.enemies_total} hostiles` : "All hostiles"} neutralised in ${formatTime(state.game.elapsed_ms)}. ${state.game.players.filter((p) => p.hp > 0).length} operators survived.`
         : "Every corner is a lesson. Regroup with your squad and try a new approach.";
     $("play-again").disabled = !leader || !state.connected;
     $("play-again").textContent = leader

@@ -2,6 +2,10 @@
 
 Breach is a cooperative browser prototype with an authoritative Phoenix server. The browser sends intent (movement, aim, firing and reload); it never supplies actor positions, health, hits or enemy decisions. Phoenix Channels carry lobby actions and snapshots. Phoenix PubSub distributes text chat and lobby/game updates only within the joined lobby topic. Chat is disabled during an active mission.
 
+The initial page contains only create/join controls and an independent display map. `GET /preview-map` generates fresh public geometry on the backend with `Cache-Control: no-store`, without starting a lobby. The browser renders raised walls with a slowly rotating perspective projection; reduced-motion preferences hold the angle still. Lobby members appear as a vertical list above deployment and chat. Debrief chat is inside the result panel.
+
+The native Controls dialog edits physical keyboard bindings for movement, reload and squad orders. Validated bindings persist under `breach-keybindings` in Local Storage, with migration from the earlier EDSF preference. Duplicate or unsupported bindings cannot be saved. Opening the dialog releases movement/fire without pausing the shared simulation. Friendly reload rings use authoritative `reload_ms` and remain visible until completion is confirmed by the server.
+
 ## Relationship to evadne/snake
 
 The reference was inspected on GitHub, rather than assumed to be installed locally. In [SnakeWeb.SnakeLive](https://github.com/evadne/snake/blob/master/apps/snake_web/lib/snake_web/live/snake_live.ex), creating a game redirects to its identifier, and mounting an existing identifier loads the same game backend. Connected visitors subscribe to that game's backend, a game-specific Phoenix PubSub topic, and Presence. Consequently, a shareable game identifier joins existing state while other identifiers remain isolated.

@@ -9,10 +9,10 @@ Execute in this order; keep the README aligned with the shipped behaviour.
 - [x] Show reloading operators with a visible circular indicator.
 - [x] Remove standby fireteam and inactive chat from the initial page.
 - [x] Generate a fresh landing-page map on the backend for every load; display a very slowly rotating angled 3D preview.
-- [ ] Integrate a vertical fireteam list above Deploy Squad in the lobby.
-- [ ] Place chat below the fireteam list and deployment controls.
+- [x] Integrate a vertical fireteam list above Deploy Squad in the lobby.
+- [x] Place chat below the fireteam list and deployment controls.
 
-Verify saved controls, mission input, landing/loading states, lobby leadership, responsive layouts and the reload indicator before closing these items.
+Validation: 61 server tests, 38 client tests and the live socket smoke suite pass. Browser checks cover saved bindings and duplicate-key rejection, desktop and narrow-screen staging, invitations, peer chat, leadership transfer, deployment, keyboard squad orders and the visible reload ring. Production deployment is separate from this local usability work.
 
 ## Responsiveness follow-up
 

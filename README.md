@@ -13,7 +13,7 @@ mix deps.get
 mix phx.server
 ```
 
-Open **http://localhost:4000**. Enter a callsign and create an operation. Share the invite link or lobby code with teammates, or have them scan the large QR code in staging. Scanning opens the same lobby invitation, where they choose a callsign and join; another browser tab also works. QR codes are generated locally and disappear during gameplay. The first connected operator leads. The leader chooses the formation and starts with one or more connected humans. Bots fill the remaining four squad positions.
+Open **http://localhost:4000**. Enter a callsign and choose **Create lobby**, or use **Join lobby** with an invite code. The lobby lists each squad member above the formation choices and **Deploy Squad** button; chat sits below deployment. Share the invite link or lobby code with teammates, or have them scan the QR code. An invitation makes joining the primary action. A keyboard and mouse are needed to play. QR codes are generated locally and disappear during gameplay. The first connected player leads and can deploy solo or with friends; AI fills the remaining slots in the four-person squad. Guests see who will deploy and can choose an empty slot.
 
 The landing page requests fresh facility geometry from the backend on every load and shows a slowly rotating 3D preview. Reduced-motion preferences stop the rotation. This is an independent preview; the shared mission map is generated when the leader deploys.
 
@@ -35,7 +35,7 @@ Your movement and gun feedback respond locally. Shared server history compensate
 
 Living operators share current line of sight. The blueprint remains visible as a navigation aid; unexplored and out-of-sight areas are dimmed. For living operators, hostiles are only transmitted while visible. When you die, you become a spectator with full visibility of all actors until the next round. Walls block movement, vision, and hitscan shots. There is no friendly fire. Clear every hostile to win; losing all four operators ends the mission. The leader can then return to staging for a newly generated map. Bots have reaction delays and imperfect aim; enemies only pursue seen or heard threats, with expiring memory.
 
-AI teammates draw unique human names from a shared lobby repertoire (for example, Jason (AI)); names stay consistent when deploying. Each connected member selects a free squad slot in staging. The leader can transfer command to another connected member. If the leader disconnects, a randomly selected remaining member leads. A disconnected operator becomes a bot, and a new arrival can take over a free bot slot during play, retaining its position and condition.
+AI teammates draw unique human names from a shared lobby repertoire (for example, Jason (AI)); names stay consistent when deploying. Each connected member can select a free squad slot in staging. The leader can transfer command to another connected member from the lobby. If the leader disconnects, a randomly selected remaining member leads. A disconnected operator becomes a bot, and a new arrival can take over a free bot slot during play, retaining its position and condition.
 
 ## Verification
 

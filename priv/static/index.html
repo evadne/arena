@@ -67,7 +67,7 @@
           /></label>
         </div>
       </header>
-      <section class="staging-content">
+      <section class="staging-content" id="landing-content">
         <div class="briefing" id="briefing">
           <div class="briefing-tag">
             <span class="signal-bars">▂▄▆</span> COOPERATIVE TACTICAL SHOOTER
@@ -106,18 +106,19 @@
           </div>
         </div>
       </section>
-      <section class="invite-qr" id="invite-qr" aria-labelledby="invite-qr-title" hidden>
-        <h2 id="invite-qr-title">SCAN TO JOIN THE SQUAD</h2>
-        <img id="invite-qr-image" width="260" height="260" alt="Operation invitation QR code" />
-        <p>Choose your callsign. Join the fireteam.</p>
-        <div class="invite-qr-code">OPERATION <strong id="invite-qr-code">—</strong></div>
-      </section>
+
+      <div class="lobby-layout" id="lobby-layout" hidden>
+        <div class="lobby-main" id="lobby-main">
+          <header class="lobby-heading">
+            <span class="briefing-tag">SQUAD ASSEMBLY</span>
+            <h1>Ready to breach.</h1>
+          </header>
       <section class="squad-panel" id="squad-panel" hidden>
         <div class="squad-heading">
           <h2>FIRETEAM <span id="squad-count">0 / 4</span></h2>
           <span class="tiny-label" id="lobby-state">STANDBY</span>
         </div>
-        <div id="roster" class="roster"></div>
+        <div id="roster" class="roster" role="list" aria-label="Squad members"></div>
         <div class="squad-bottom">
           <div
             class="formation-options"
@@ -136,6 +137,17 @@
           <p class="helper">AI fills empty slots. You can deploy solo.</p>
         </div>
       </section>
+      <div class="deployment-bar">
+        <div class="deployment-info">
+          <h3 id="mission-status">Ready when you are.</h3>
+          <p id="mission-description">
+            Create an operation to assemble your team.
+          </p>
+        </div>
+        <button class="primary deploy-button" id="start-game" disabled>
+          DEPLOY SQUAD <span>↗</span>
+        </button>
+      </div>
       <section class="comms-panel" id="comms-panel" hidden>
         <div class="comms-heading">
           <h2><span class="comms-dot"></span>SQUAD CHAT</h2>
@@ -154,6 +166,15 @@
           /><button type="submit" aria-label="Send message" disabled>↵</button>
         </form>
       </section>
+        </div>
+      <section class="invite-qr" id="invite-qr" aria-labelledby="invite-qr-title" hidden>
+        <h2 id="invite-qr-title">SCAN TO JOIN THE SQUAD</h2>
+        <img id="invite-qr-image" width="260" height="260" alt="Operation invitation QR code" />
+        <p>Share the link or scan to join this lobby.<br />A keyboard and mouse are needed to play.</p>
+        <button class="secondary" id="qr-copy-invite">COPY INVITE LINK</button>
+        <div class="invite-qr-code">OPERATION <strong id="invite-qr-code">—</strong></div>
+      </section>
+      </div>
       <div class="map-toolbar">
         <div class="mission-heading">
           <span class="live-dot"></span
@@ -164,17 +185,6 @@
         </div>
         <span id="mission-clock">00:00</span
         ><span id="map-scale" hidden>TOP DOWN</span>
-      </div>
-      <div class="deployment-bar">
-        <div class="deployment-info">
-          <h3 id="mission-status">Ready when you are.</h3>
-          <p id="mission-description">
-            Create an operation to assemble your team.
-          </p>
-        </div>
-        <button class="primary deploy-button" id="start-game" disabled>
-          DEPLOY SQUAD <span>↗</span>
-        </button>
       </div>
       <div
         class="command-strip"
