@@ -61,7 +61,7 @@ docker run --rm -p 4000:4000 -e SECRET_KEY_BASE -e HOST=localhost arena:local
 
 In another terminal, check `curl --fail http://localhost:4000/health`. The production socket origin configuration assumes HTTPS, so use the normal development server for browser gameplay on plain localhost, or provide a local HTTPS proxy for a complete production-origin test. Run `unset SECRET_KEY_BASE` after stopping the container.
 
-## Prepared responsiveness release — 21 September 2026
+## Responsiveness release — 21 September 2026
 
 `flyctl apps list` confirmed `evadne-arena` in the personal organisation. Strict configuration validation passed and `SECRET_KEY_BASE` is deployed. The production target remains one Machine, `84ed543c26ed78`, in `lhr`, using `shared-cpu-2x:1024MB`.
 
@@ -70,9 +70,11 @@ The responsiveness changes at source commit `c01c8c02740475351fd8c6b13ae48a0e55c
 - Tag: `registry.fly.io/evadne-arena:commit-c01c8c027404`
 - Immutable image: `registry.fly.io/evadne-arena@sha256:dddc2e6acd5df59b8d48b4141a2f93987da6748630cc1be3db471edf0287ce08`
 
-The image is prepared, **not deployed**. The existing Machine remained at version 6, on `registry.fly.io/evadne-arena:deployment-01M32PEBVC2K3CQE1W1G8Q2BCY`, with its health check passing and `/health` returning `ok` after the build. Source verification before preparation passed 60 server tests, 35 client tests and the local socket smoke suite; production gameplay verification is still required after rollout.
+The image was deployed with operator approval at 22:36 UTC as Fly release 7. Machine `84ed543c26ed78` runs the exact digest above; exactly one application Machine remains in London with its health check passing and public `/health` returning `ok`. Source verification before preparation passed 60 server tests, 35 client tests and the local socket smoke suite.
 
-Deploy the prepared image without rebuilding:
+All production Phoenix Channels smoke checks passed after rollout, including lobby isolation, chat, leadership, launch, movement, shooting, reloads, disconnect replacement, reset and late join. A twelve-second protocol 3 probe received 236 frames, with median arrival interval 51.0 ms, maximum gap 55.4 ms and no gaps above 100 ms; median measured RTT was 4.7 ms. This short sample verifies delivery from this machine, not sustained latency or subjective play feel for every player.
+
+Redeploy the same image without rebuilding:
 
 ```sh
 flyctl deploy --app evadne-arena --ha=false \
