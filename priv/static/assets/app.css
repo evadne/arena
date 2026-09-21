@@ -144,12 +144,6 @@ canvas {
 .brand-mark i:nth-child(3) {
   height: 9px;
 }
-.build-number {
-  font: 9px var(--mono);
-  letter-spacing: 0;
-  color: #4e6554;
-  margin-left: 6px;
-}
 .header-meta {
   display: flex;
   align-items: center;
@@ -599,16 +593,6 @@ input:focus {
   font-size: 18px;
   padding: 0 3px;
 }
-.map-coordinates {
-  position: absolute;
-  top: 17%;
-  right: 5%;
-  font: 7px/1.9 var(--mono);
-  letter-spacing: 1.4px;
-  color: #658060;
-  pointer-events: none;
-}
-#retry-preview { pointer-events: auto; }
 .map-compass {
   position: absolute;
   right: 5%;
@@ -624,23 +608,6 @@ input:focus {
 .map-compass span:last-child {
   font-size: 26px;
   font-family: serif;
-}
-.map-bottom-note {
-  position: absolute;
-  right: 4vw;
-  bottom: 43%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  font: 7px var(--mono);
-  letter-spacing: 1.8px;
-  color: #536b48;
-  pointer-events: none;
-}
-.map-bottom-note > span:last-child {
-  color: #354f36;
-  font-size: 6px;
 }
 .map-toolbar {
   display: none;
@@ -773,8 +740,7 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
 .operation-active .staging-content,
 .operation-active .comms-panel,
 .operation-active .squad-heading,
-.operation-active .squad-bottom,
-.operation-active .map-coordinates {
+.operation-active .squad-bottom {
   display: none;
 }
 .operation-active .canvas-wrap {
@@ -800,9 +766,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
 }
 .operation-active .brand-mark {
   transform: skew(-15deg) scale(0.8);
-}
-.operation-active .build-number {
-  display: none;
 }
 .operation-active .header-meta {
   gap: 16px;
@@ -1041,9 +1004,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .brand {
     font-size: 22px;
   }
-  .build-number {
-    display: none;
-  }
   .header-meta {
     gap: 14px;
   }
@@ -1164,16 +1124,8 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .game-shell:has(#entry-panel:not([hidden])) {
     height: 985px;
   }
-  .map-coordinates {
-    top: 40%;
-    right: 6%;
-    font-size: 6px;
-  }
   .map-compass {
     display: none;
-  }
-  .map-bottom-note {
-    display: none !important;
   }
   .notice {
     top: 75px;
@@ -1574,8 +1526,6 @@ body:not(.operation-active) .lobby-layout .comms-panel input { font-size: 11px; 
 body:not(.operation-active) .lobby-layout .comms-panel input::placeholder { font-size: 10px; color: #91ab7c; }
 body:not(.operation-active) .lobby-layout .invite-qr { padding: 20px; background: #0b1510e6; border: 1px solid var(--line); }
 body:not(.operation-active) .lobby-layout .invite-qr p { font-size: 10px; }
-body.is-connected:not(.operation-active) .map-coordinates,
-body.is-connected:not(.operation-active) .map-bottom-note { display: none; }
 .operation-active .lobby-heading { display: none; }
 .operation-over .end-screen { max-height: calc(100dvh - 140px); overflow: auto; }
 .operation-over .end-screen .comms-panel {
@@ -1597,4 +1547,32 @@ body.is-connected:not(.operation-active) .map-bottom-note { display: none; }
   body:not(.operation-active) .game-shell:has(#entry-panel:not([hidden])) { height: auto; min-height: 760px; }
   .header-meta { gap: 12px; }
   .operation-over .end-screen { max-height: calc(100dvh - 110px); }
+}
+
+/* Clear, accessible header actions. */
+.header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid #647f58;
+  border-radius: 5px;
+  background: #17251c;
+  color: #c4d5b7;
+  font: 12px var(--mono);
+  white-space: nowrap;
+}
+.header-button:hover { background: #263b29; border-color: #9cb889; color: #eef5e5; }
+.header-button:active { background: #344b33; }
+.header-button:focus-visible { outline: 2px solid #d5e4a8; outline-offset: 3px; }
+.header-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+#sound-toggle[aria-pressed="true"] .sound-muted,
+#sound-toggle[aria-pressed="false"] .sound-waves { display: none; }
+@media (max-width: 760px) {
+  .header-meta { gap: 8px; }
+  .header-button { padding: 10px; }
+  .header-button .button-label { display: none; }
 }

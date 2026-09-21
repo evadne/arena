@@ -18,19 +18,10 @@
         <div class="scene-vignette"></div>
         <div class="scene-grain"></div>
         <div class="map-compass"><span>N</span><span>↑</span></div>
-        <div class="map-coordinates">
-          <span id="preview-status" role="status">GENERATING FACILITY PREVIEW…</span><br />MISSION MAP GENERATED ON DEPLOY<br /><button id="retry-preview" class="text-button" hidden>Retry preview</button>
-        </div>
-        <div class="map-bottom-note" id="map-bottom-note">
-          <span>PROCEDURAL FACILITY</span><span>PLAN YOUR NEXT ENTRY.</span>
-        </div>
       </div>
       <header class="topbar">
         <a class="brand" href="/" aria-label="Breach home"
-          ><span class="brand-mark"><i></i><i></i><i></i></span>BREACH<span
-            class="build-number"
-            >/ 001</span
-          ></a
+          ><span class="brand-mark"><i></i><i></i><i></i></span>BREACH</a
         >
         <div id="session-panel" hidden>
           <div class="session-code">
@@ -46,16 +37,24 @@
           <button class="text-button" id="leave-lobby">LEAVE LOBBY</button>
         </div>
         <div class="header-meta">
-          <button class="icon-button" id="open-controls" aria-haspopup="dialog">CONTROLS</button>
-          <span class="connection" id="connection"><i></i>NOT IN A LOBBY</span
+          <button class="header-button" id="open-controls" aria-haspopup="dialog" aria-label="Controls" title="Controls">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3-.6 2.5-2 .9-2.3-.7-3 5.2 1.7 1.8v2.3l-1.7 1.8 3 5.2 2.3-.7 2 .9L9 24h6l.6-2.5 2-.9 2.3.7 3-5.2-1.7-1.8V12l1.7-1.8-3-5.2-2.3.7-2-.9L15 3Z" transform="translate(2 0) scale(.83)"/><circle cx="12" cy="11.2" r="3"/></svg>
+            <span class="button-label">Controls</span>
+          </button>
+          <span class="connection" id="connection" role="status" hidden></span
           ><button
-            class="icon-button"
+            class="header-button"
             id="sound-toggle"
             aria-label="Mute sound"
             title="Toggle sound"
             aria-pressed="true"
           >
-            SOUND ON</button
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4Z"/>
+              <g class="sound-waves"><path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14"/></g>
+              <g class="sound-muted"><path d="m16 9 6 6m0-6-6 6"/></g>
+            </svg>
+            <span class="button-label" id="sound-label">Sound on</span></button
           ><label class="volume-control" title="Sound volume"
             ><input
               type="range"

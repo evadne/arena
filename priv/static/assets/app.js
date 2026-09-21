@@ -96,6 +96,7 @@ function action(event, payload = {}, callback) {
 }
 function setConnection(connected, label) {
   state.connected = connected;
+  $("connection").hidden = !connected && !label;
   $("connection").classList.toggle("online", connected);
   $("connection").innerHTML = "";
   const dot = document.createElement("i");
@@ -536,7 +537,6 @@ function updateUI() {
   $("briefing").hidden = playing || over;
   $("end-screen").hidden = !over;
   $("player-hud").hidden = !playing;
-  $("map-bottom-note").hidden = playing || over;
   document.querySelector(".map-compass").hidden = !state.game;
   $("start-game").disabled =
     !state.connected || !leader || status !== "waiting";
@@ -843,7 +843,7 @@ function unlockAudio() {
   }
 }
 function syncSoundUI() {
-  $("sound-toggle").textContent = state.muted ? "SOUND OFF" : "SOUND ON";
+  $("sound-label").textContent = state.muted ? "Sound off" : "Sound on";
   $("sound-toggle").setAttribute(
     "aria-label",
     state.muted ? "Enable sound" : "Mute sound",
@@ -971,20 +971,15 @@ let preview = null;
 const previewStarted = performance.now();
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 async function loadPreview() {
-  $("preview-status").textContent = "GENERATING FACILITY PREVIEW…";
-  $("retry-preview").hidden = true;
   try {
     const response = await fetch("/preview-map", {cache: "no-store", signal: AbortSignal.timeout(8000)});
     if (!response.ok) throw new Error("Preview unavailable");
     const {map} = await response.json();
     preview = previewMesh(map);
-    $("preview-status").textContent = `${map.archetype.toUpperCase()} / ${map.rooms.length} ROOMS`;
   } catch {
-    $("preview-status").textContent = "PREVIEW UNAVAILABLE · YOU CAN STILL JOIN OR CREATE A LOBBY";
-    $("retry-preview").hidden = false;
+    // The decorative preview is optional; lobby actions remain available.
   }
 }
-$("retry-preview").addEventListener("click", loadPreview);
 loadPreview();
 function resize() {
   const rect = canvas.getBoundingClientRect(),
