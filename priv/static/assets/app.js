@@ -2,6 +2,7 @@ import { Socket } from "./phoenix.mjs";
 import { SnapshotBuffer, mergeSnapshotMap, interpolateActor } from "./snapshot_buffer.mjs";
 
 import { FrameDecoder } from "./frame_decoder.mjs";
+import { inviteURL, inviteQRSvg } from "./invite_qr.mjs";
 
 const snapshots = new SnapshotBuffer();
 const frames = new FrameDecoder();
@@ -15,6 +16,7 @@ const state = {
   lobby: null,
   game: null,
   fogCells: [],
+  inviteQrUrl: null,
   connected: false,
   joining: false,
   keys: new Set(),
@@ -229,7 +231,7 @@ $("join-form").addEventListener("submit", (e) => {
 $("leave-lobby").addEventListener("click", () => disconnect());
 $("copy-invite").addEventListener("click", async () => {
   try {
-    await navigator.clipboard.writeText(location.href);
+    await navigator.clipboard.writeText(inviteURL(location.href, state.lobby.code));
     notify("Invite link copied. Send it to your squad.");
   } catch {
     notify(`Invite code: ${state.lobby?.code}. Share this page’s address.`);
@@ -383,6 +385,31 @@ function renderRoster() {
   }
   $("squad-count").textContent = `${members.length} / 4`;
 }
+function updateInviteQR() {
+  const url = state.connected && state.lobby && phase() === "waiting"
+    ? inviteURL(location.href, state.lobby.code)
+    : null;
+  if (url === state.inviteQrUrl) return;
+  state.inviteQrUrl = url;
+  const panel = $("invite-qr");
+  const image = $("invite-qr-image");
+  panel.hidden = !url;
+  document.body.classList.toggle("has-invite", !!url);
+  if (!url) {
+    image.removeAttribute("src");
+    $("invite-qr-code").textContent = "—";
+    return;
+  }
+  try {
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(inviteQRSvg(url))}`;
+    image.alt = `Scan to join operation ${state.lobby.code}`;
+    $("invite-qr-code").textContent = state.lobby.code;
+  } catch {
+    // A very long/custom page URL must not prevent joining or copying an invite.
+    panel.hidden = true;
+    document.body.classList.remove("has-invite");
+  }
+}
 function updateUI() {
   const joined = !!state.lobby,
     status = phase(),
@@ -391,6 +418,7 @@ function updateUI() {
     leader = isLeader();
   document.body.classList.toggle("operation-active", playing || over);
   document.body.classList.toggle("is-connected", joined);
+  updateInviteQR();
   $("command-strip").hidden = !playing;
   document.querySelectorAll("[data-order]").forEach((button) => {
     button.classList.toggle(

@@ -1563,3 +1563,68 @@ kbd {
     top: calc(17vh + 290px);
   }
 }
+
+/* A printed invitation over the briefing map, with an intact QR quiet zone. */
+.invite-qr {
+  position: absolute;
+  top: max(100px, 16vh);
+  right: 7vw;
+  width: clamp(220px, 24vw, 260px);
+  text-align: center;
+}
+.invite-qr h2 {
+  margin: 0 0 14px;
+  font: 9px var(--mono);
+  letter-spacing: 1.5px;
+  color: #b9d298;
+}
+.invite-qr img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  background: #fff;
+  image-rendering: pixelated;
+}
+.invite-qr p {
+  margin: 12px 0 8px;
+  font: 8px/1.6 var(--mono);
+  color: #91ab7c;
+}
+.invite-qr-code {
+  font: 8px var(--mono);
+  letter-spacing: 1px;
+  color: #627d56;
+}
+.invite-qr-code strong {
+  margin-left: 7px;
+  color: #c1d8a5;
+  font-weight: 500;
+}
+.operation-active .invite-qr {
+  display: none;
+}
+@media (max-height: 650px) and (min-width: 761px) {
+  .invite-qr {
+    top: 90px;
+    width: 220px;
+  }
+}
+@media (max-width: 760px) {
+  .invite-qr {
+    top: 555px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(260px, 86vw);
+  }
+  .has-invite .game-shell {
+    height: 1320px;
+  }
+  .has-invite .squad-panel {
+    top: 930px;
+  }
+  .has-invite .comms-panel {
+    top: 1085px;
+  }
+}
