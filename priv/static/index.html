@@ -19,7 +19,7 @@
         <div class="scene-grain"></div>
         <div class="map-compass"><span>N</span><span>↑</span></div>
         <div class="map-coordinates">
-          FACILITY / UNKNOWN<br />RECON FEED — LIVE
+          FACILITY PREVIEW<br />MISSION MAP GENERATED ON DEPLOY
         </div>
         <div class="map-bottom-note" id="map-bottom-note">
           <span>PROCEDURAL FACILITY</span><span>NO TWO ENTRIES ALIKE.</span>
@@ -34,20 +34,20 @@
         >
         <div id="session-panel" hidden>
           <div class="session-code">
-            <span>OP</span><strong id="session-code">—</strong
+            <span>LOBBY</span><strong id="session-code">—</strong
             ><button
               class="icon-button"
               id="copy-invite"
               title="Copy invitation link"
             >
-              INVITE +
+              COPY INVITE
             </button>
           </div>
-          <button class="text-button" id="leave-lobby">LEAVE ↗</button>
+          <button class="text-button" id="leave-lobby">LEAVE LOBBY</button>
         </div>
         <div class="header-meta">
           <button class="icon-button" id="open-controls" aria-haspopup="dialog">CONTROLS</button>
-          <span class="connection" id="connection"><i></i>OFFLINE</span
+          <span class="connection" id="connection"><i></i>NOT IN A LOBBY</span
           ><button
             class="icon-button"
             id="sound-toggle"
@@ -84,23 +84,24 @@
         </div>
         <div class="operation-controls">
           <div id="entry-panel">
-            <label for="player-name">01 / IDENTIFY YOURSELF</label
+            <label for="player-name">YOUR CALLSIGN (OPTIONAL)</label
             ><input
               id="player-name"
               maxlength="20"
               placeholder="YOUR CALLSIGN"
               autocomplete="nickname"
             /><button class="primary" id="create-lobby">
-              NEW OPERATION <span>↗</span>
+              CREATE LOBBY <span>↗</span>
             </button>
+            <p class="entry-help" id="entry-help">Play solo with AI, or invite up to three friends.</p>
             <form id="join-form" class="join-row">
               <input
                 id="lobby-code"
-                aria-label="Operation code"
+                aria-label="Lobby code"
                 maxlength="12"
-                placeholder="HAVE AN OPERATION CODE?"
+                placeholder="ENTER INVITE CODE"
                 autocomplete="off"
-              /><button class="secondary" type="submit">JOIN →</button>
+              /><button class="secondary" type="submit">JOIN LOBBY →</button>
             </form>
           </div>
         </div>
@@ -132,13 +133,13 @@
               <span class="formation-icon">···</span>LINE
             </button>
           </div>
-          <p class="helper">Empty slots filled by AI.</p>
+          <p class="helper">AI fills empty slots. You can deploy solo.</p>
         </div>
       </section>
       <section class="comms-panel">
         <div class="comms-heading">
-          <h2><span class="comms-dot"></span>SQUAD FREQUENCY</h2>
-          <span>ENCRYPTED</span>
+          <h2><span class="comms-dot"></span>SQUAD CHAT</h2>
+          <span>LOBBY ONLY</span>
         </div>
         <div class="chat-log" id="chat-log" role="log" aria-live="polite">
           <div class="chat-empty">Connect to establish squad comms.</div>

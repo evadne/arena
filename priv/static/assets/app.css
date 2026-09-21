@@ -248,6 +248,7 @@ canvas {
   margin-top: 29px;
   width: 300px;
 }
+.entry-help { font: 10px/1.7 var(--mono); color: #a1b795; margin: 14px 0 0; }
 label {
   font: 8px var(--mono);
   letter-spacing: 1px;

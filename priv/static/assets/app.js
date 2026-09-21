@@ -57,11 +57,13 @@ function saveStorage(key, value) {
 }
 $("player-name").value = readStorage("breach-name", "");
 const incomingCode = new URL(location.href).searchParams.get("lobby");
-if (incomingCode)
+if (incomingCode) {
   $("lobby-code").value = incomingCode
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 12);
+  $("entry-help").textContent = `Invite to lobby ${$("lobby-code").value}. Enter your callsign, then choose Join lobby.`;
+}
 function notify(message, error = false) {
   clearTimeout(noticeTimer);
   $("notice").textContent = message;
@@ -94,7 +96,7 @@ function setConnection(connected, label) {
   const dot = document.createElement("i");
   $("connection").append(
     dot,
-    document.createTextNode(label || (connected ? "CONNECTED" : "OFFLINE")),
+    document.createTextNode(label || (connected ? "CONNECTED" : "NOT IN A LOBBY")),
   );
   if (!connected) releaseInput();
   updateUI();
@@ -175,12 +177,12 @@ function join(code) {
       $("chat-log").replaceChildren();
       (reply.lobby.chat || []).forEach(addChat);
       if (!(reply.lobby.chat || []).length)
-        addSystem("Secure frequency established. Your squad is listening.");
+        addSystem("Squad chat is ready. Messages stay in this lobby.");
       const url = new URL(location.href);
       url.searchParams.set("lobby", reply.lobby.code);
       history.replaceState({}, "", url);
       notify(
-        "Operation connected. Share the invite link to assemble your squad.",
+        isLeader() ? "Lobby ready. Invite friends or deploy now with AI teammates." : "You joined the squad. The leader will deploy when ready.",
       );
     })
     .receive("error", (reply) => {
@@ -217,6 +219,7 @@ function disconnect(clearUrl = true) {
     url.searchParams.delete("lobby");
     history.replaceState({}, "", url);
   }
+  $("entry-help").textContent = "Play solo with AI, or invite up to three friends.";
   $("chat-log").replaceChildren();
   const empty = document.createElement("div");
   empty.className = "chat-empty";
@@ -420,8 +423,8 @@ function renderRoster() {
     detail.textContent = member
       ? state.lobby.leader_id === member.id
         ? "SQUAD LEADER"
-        : "OPERATOR / READY"
-      : "AUTONOMOUS SUPPORT";
+        : "PLAYER / READY"
+      : "AI TEAMMATE";
     if (player)
       detail.textContent =
         player.hp > 0
@@ -432,14 +435,14 @@ function renderRoster() {
     if (!member && state.lobby && phase() === "waiting") {
       const b = document.createElement("button");
       b.className = "operator-action";
-      b.textContent = "TAKE";
+      b.textContent = "USE SLOT";
       b.title = `Move to slot ${slot + 1}`;
       b.addEventListener("click", () => action("slot", { slot }));
       row.append(b);
     } else if (member && !me && isLeader()) {
       const b = document.createElement("button");
       b.className = "operator-action";
-      b.textContent = "↑";
+      b.textContent = "MAKE LEADER";
       b.title = `Transfer leadership to ${member.name}`;
       b.setAttribute("aria-label", b.title);
       b.addEventListener("click", () =>
@@ -459,7 +462,7 @@ function renderRoster() {
     }
     roster.append(row);
   }
-  $("squad-count").textContent = `${members.length} / 4`;
+  $("squad-count").textContent = `${members.length} ${members.length === 1 ? "PLAYER" : "PLAYERS"} · ${4 - members.length} AI`;
 }
 function updateInviteQR() {
   const url = state.connected && state.lobby && phase() === "waiting"
@@ -494,6 +497,7 @@ function updateUI() {
     leader = isLeader();
   document.body.classList.toggle("operation-active", playing || over);
   document.body.classList.toggle("is-connected", joined);
+  document.body.classList.toggle("operation-over", over);
   updateInviteQR();
   $("command-strip").hidden = !playing;
   document.querySelectorAll("[data-order]").forEach((button) => {
@@ -543,7 +547,9 @@ function updateUI() {
     ? "OPERATION ACTIVE <span>•</span>"
     : over
       ? "OPERATION ENDED <span>■</span>"
-      : "DEPLOY SQUAD <span>↗</span>";
+      : !state.connected
+        ? "RECONNECTING…"
+        : leader ? "DEPLOY SQUAD <span>↗</span>" : "WAITING FOR LEADER";
   $("map-title").textContent = playing
     ? state.game?.spectator
       ? "SPECTATING / FULL OVERVIEW"
@@ -555,14 +561,14 @@ function updateUI() {
     ? (
         state.game?.map?.archetype || `OPERATION ${state.lobby.code}`
       ).toUpperCase()
-    : "PROCEDURAL TRAINING FACILITY";
+    : "FACILITY PREVIEW";
   $("mission-status").textContent = playing
     ? state.game?.spectator
       ? "Operator down. Follow your squad."
       : "Keep your squad together."
     : over
       ? status === "won"
-        ? "All hostiles neutralized."
+        ? "All hostiles neutralised."
         : "Squad lost. Regroup and adapt."
       : joined
         ? "Your operation is ready."
@@ -573,14 +579,19 @@ function updateUI() {
       ? "Return to briefing for a new procedural facility."
       : joined
         ? leader
-          ? "You lead the squad. Deploy whenever you’re ready."
-          : "Your squad leader will begin the operation."
+          ? "Invite friends, choose a formation, then deploy. AI fills any empty slots."
+          : `${state.lobby.members.find(m => m.id === state.lobby.leader_id)?.name || "Your leader"} will deploy the squad. You can choose an empty slot below.`
         : "Create an operation to assemble your team.";
+  if (joined && !state.connected) {
+    $("mission-status").textContent = "Connection interrupted";
+    $("mission-description").textContent = "Reconnecting automatically. Controls will resume when the connection returns.";
+  }
   document.querySelectorAll("[data-formation]").forEach((button) => {
     button.classList.toggle(
       "selected",
       button.dataset.formation === (state.lobby?.formation || "stack"),
     );
+    button.setAttribute("aria-pressed", String(button.dataset.formation === (state.lobby?.formation || "stack")));
     button.disabled = !state.connected || !leader || status !== "waiting";
   });
   if (over) {
