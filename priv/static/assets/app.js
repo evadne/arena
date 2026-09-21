@@ -273,12 +273,6 @@ $("command-strip").addEventListener("click", (event) => {
 });
 let draftBindings, listeningFor = null;
 function syncBindingLabels() {
-  $("movement-keys").replaceChildren(...["up", "left", "down", "right"].map(action => {
-    const key = document.createElement("kbd");
-    key.textContent = keyLabel(state.bindings[action]);
-    return key;
-  }));
-  $("reload-key").textContent = keyLabel(state.bindings.reload);
   document.querySelectorAll("[data-order]").forEach(button => {
     const key = keyLabel(state.bindings[button.dataset.order]);
     button.querySelector("span").textContent = key;
