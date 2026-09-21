@@ -47,6 +47,8 @@ ARENA_PROTOCOL=3 node scripts/network_probe.mjs
 
 See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md). The [movement prediction investigation](docs/movement-prediction.md) describes proposed next steps; prediction is not enabled yet.
 
+Deferred work, including hitscan lag compensation, is tracked in the [backlog](docs/backlog.md).
+
 ## Deployment notes and limits
 
 This is a desktop-keyboard prototype, with in-memory lobbies on one BEAM node. Server restarts discard sessions; lobbies close when their last human leaves. It does not include account authentication, persistent progress, distributed lobby ownership, matchmaking, or a production abuse-prevention layer. Room codes are invitations, not secrets. The Phoenix browser client is vendored with its MIT license in `priv/static/assets`; update it alongside the locked Phoenix dependency.
