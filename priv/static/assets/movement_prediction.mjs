@@ -59,8 +59,9 @@ export class MovementPrediction {
   }
   setRTT(ms) { if (Number.isFinite(ms)) this.rtt = Math.max(0, Math.min(300, ms)); }
   input(direction, now) {
+    const resumed = this.suspended;
     this.suspended = false;
-    if (direction.x === this.direction.x && direction.y === this.direction.y) return;
+    if (!resumed && direction.x === this.direction.x && direction.y === this.direction.y) return;
     this.direction = { ...direction };
     this.inputs.push({ ...direction, at: now });
     this.inputs = this.inputs.filter((entry) => entry.at >= now - 1000).slice(-128);
@@ -106,7 +107,7 @@ export class MovementPrediction {
   forecast(now) {
     if (!this.actor) return null;
     if (!this.active || this.suspended) return this.actor;
-    const end = Math.max(this.anchorAt, Math.min(now, this.anchorAt + 200));
+    const end = Math.max(this.anchorAt, Math.min(now, this.anchorAt + Math.min(400, Math.max(200, this.rtt + 100))));
     let position = this.actor;
     let direction = { x: this.control.x || 0, y: this.control.y || 0 };
     let index = 0;

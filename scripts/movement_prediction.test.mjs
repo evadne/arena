@@ -24,7 +24,7 @@ test('normalised diagonal speed, exact tangency and solid out-of-bounds', () => 
   assert.ok(Math.abs(Math.hypot(p.x-100,p.y-100)-7)<1e-8);
 });
 test('movement begins on the next render before any server response, for multiple RTTs', () => {
-  for (const rtt of [0,60,120]) {
+  for (const rtt of [0,60,120,240]) {
     const p=new MovementPrediction(); p.setRTT(rtt); p.accept(snapshot(), 'me',0);
     p.input({x:1,y:0},0);
     assert.ok(Math.abs(p.sample(16).x-102.24)<1e-8);
@@ -59,4 +59,9 @@ test('reconciliation converges, and death, repeated-seed rounds and suspension r
   assert.equal(p.sample(500).x,110);
   p.accept({...snapshot(0,400),round_id:2},'me',120);
   assert.equal(p.sample(140).x,400); assert.equal(p.inputs.length,0);
+});
+test('focus return applies neutral input even when the last server control was moving', () => {
+  const p=new MovementPrediction(); p.accept(snapshot(0,100,{x:1,y:0}),'me',0);
+  p.suspend(); p.input({x:0,y:0},10);
+  assert.equal(p.sample(30).x,p.sample(10).x);
 });
