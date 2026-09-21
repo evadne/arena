@@ -645,6 +645,7 @@ input:focus {
   color: #658060;
   pointer-events: none;
 }
+#retry-preview { pointer-events: auto; }
 .map-compass {
   position: absolute;
   right: 5%;

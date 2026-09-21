@@ -15,6 +15,8 @@ mix phx.server
 
 Open **http://localhost:4000**. Enter a callsign and create an operation. Share the invite link or lobby code with teammates, or have them scan the large QR code in staging. Scanning opens the same lobby invitation, where they choose a callsign and join; another browser tab also works. QR codes are generated locally and disappear during gameplay. The first connected operator leads. The leader chooses the formation and starts with one or more connected humans. Bots fill the remaining four squad positions.
 
+The landing page requests fresh facility geometry from the backend on every load and shows a slowly rotating 3D preview. Reduced-motion preferences stop the rotation. This is an independent preview; the shared mission map is generated when the leader deploys.
+
 For another machine on your LAN, use the host machine's LAN address and port 4000 in the invitation. `localhost` links only work on the same machine. The development server binds all interfaces. Fly.io deployment is configured in [fly.toml](fly.toml); see the [deployment guide](docs/deployment.md).
 
 ## Controls

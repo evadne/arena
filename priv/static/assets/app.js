@@ -1,3 +1,4 @@
+import { previewMesh, drawPreview } from "./map_preview.mjs";
 import { ACTIONS, DEFAULT_BINDINGS, STORAGE_KEY, loadBindings, bindingError, keyLabel, supportedKey, movementFor } from "./keybindings.mjs";
 import { Socket } from "./phoenix.mjs";
 import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "./snapshot_buffer.mjs";
@@ -544,6 +545,7 @@ function updateUI() {
   $("end-screen").hidden = !over;
   $("player-hud").hidden = !playing;
   $("map-bottom-note").hidden = playing || over;
+  document.querySelector(".map-compass").hidden = !state.game;
   $("start-game").disabled =
     !state.connected || !leader || status !== "waiting";
   $("start-game").innerHTML = playing
@@ -981,43 +983,25 @@ function playEventSound(event, listener, game) {
   }, 1600);
 }
 
-// The deployment preview is deliberately a blueprint, never an enemy-location leak.
-const preview = {
-  width: 1024,
-  height: 704,
-  tile_size: 32,
-  rooms: [
-    { x: 64, y: 64, w: 256, h: 192, label: "STORAGE" },
-    { x: 352, y: 64, w: 288, h: 192, label: "OFFICES" },
-    { x: 672, y: 64, w: 288, h: 192, label: "SERVER ROOM" },
-    { x: 64, y: 320, w: 256, h: 320, label: "RECEIVING" },
-    { x: 352, y: 352, w: 288, h: 288, label: "OPERATIONS" },
-    { x: 672, y: 320, w: 288, h: 320, label: "WORKSHOP" },
-  ],
-  walls: [
-    { x: 32, y: 32, w: 960, h: 14 },
-    { x: 32, y: 658, w: 960, h: 14 },
-    { x: 32, y: 32, w: 14, h: 640 },
-    { x: 978, y: 32, w: 14, h: 640 },
-    { x: 320, y: 32, w: 16, h: 224 },
-    { x: 640, y: 32, w: 16, h: 224 },
-    { x: 32, y: 256, w: 120, h: 16 },
-    { x: 224, y: 256, w: 264, h: 16 },
-    { x: 560, y: 256, w: 220, h: 16 },
-    { x: 852, y: 256, w: 140, h: 16 },
-    { x: 320, y: 336, w: 16, h: 336 },
-    { x: 640, y: 336, w: 16, h: 336 },
-    { x: 32, y: 320, w: 160, h: 16 },
-    { x: 264, y: 320, w: 136, h: 16 },
-    { x: 480, y: 320, w: 264, h: 16 },
-    { x: 824, y: 320, w: 168, h: 16 },
-    { x: 110, y: 105, w: 110, h: 35 },
-    { x: 706, y: 99, w: 55, h: 90 },
-    { x: 810, y: 99, w: 55, h: 90 },
-    { x: 110, y: 470, w: 100, h: 80 },
-    { x: 725, y: 450, w: 170, h: 40 },
-  ],
-};
+let preview = null;
+const previewStarted = performance.now();
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+async function loadPreview() {
+  $("preview-status").textContent = "GENERATING FACILITY PREVIEW…";
+  $("retry-preview").hidden = true;
+  try {
+    const response = await fetch("/preview-map", {cache: "no-store", signal: AbortSignal.timeout(8000)});
+    if (!response.ok) throw new Error("Preview unavailable");
+    const {map} = await response.json();
+    preview = previewMesh(map);
+    $("preview-status").textContent = `${map.archetype.toUpperCase()} / ${map.rooms.length} ROOMS`;
+  } catch {
+    $("preview-status").textContent = "PREVIEW UNAVAILABLE · YOU CAN STILL JOIN OR CREATE A LOBBY";
+    $("retry-preview").hidden = false;
+  }
+}
+$("retry-preview").addEventListener("click", loadPreview);
+loadPreview();
 function resize() {
   const rect = canvas.getBoundingClientRect(),
     ratio = Math.min(devicePixelRatio || 1, 2);
@@ -1057,13 +1041,18 @@ function render(now) {
   }
   resize();
   const game = state.game,
-    map = game?.map || preview;
+    map = game?.map;
   const width = view.width,
     height = view.height;
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#080e0c";
   ctx.fillRect(0, 0, width, height);
-  if (game) {
+  if (!game) {
+    drawPreview(ctx, preview, width, height, now - previewStarted, reducedMotion.matches);
+    requestAnimationFrame(render);
+    return;
+  }
+  {
     const verticalSpace = width < 760 ? 205 : 180;
     view.scale = Math.max(
       0.08,
@@ -1071,13 +1060,6 @@ function render(now) {
     );
     view.x = (width - map.width * view.scale) / 2;
     view.y = 90 + (height - verticalSpace - map.height * view.scale) / 2;
-  } else {
-    view.scale = Math.min(
-      (width < 760 ? width * 1.7 : width * 0.72) / map.width,
-      (height * 0.74) / map.height,
-    );
-    view.x = width < 760 ? width * 0.09 : width * 0.41;
-    view.y = (height - map.height * view.scale) / 2 - 20;
   }
   ctx.save();
   ctx.translate(view.x, view.y);
@@ -1232,29 +1214,6 @@ function render(now) {
       ctx.fill();
       ctx.globalAlpha = 1;
     }
-  } else {
-    ctx.strokeStyle = "#c4d99044";
-    ctx.lineWidth = 1 / view.scale;
-    ctx.setLineDash([5, 7]);
-    ctx.beginPath();
-    ctx.moveTo(180, 610);
-    ctx.lineTo(180, 292);
-    ctx.lineTo(900, 292);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    for (let i = 0; i < 4; i++) {
-      const x = 155 + i * 22,
-        y = 599;
-      ctx.fillStyle = "#c3d28a";
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#b5c98655";
-      ctx.strokeRect(x - 10, y - 10, 20, 20);
-    }
-    ctx.fillStyle = "#b5c986";
-    ctx.font = `${7 / view.scale}px monospace`;
-    ctx.fillText("INSERTION POINT", 140, 635);
   }
   ctx.restore();
   if (game && state.mouse && phase() === "playing") {
