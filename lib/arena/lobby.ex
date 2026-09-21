@@ -78,9 +78,15 @@ defmodule Arena.Lobby do
 
   @impl true
   def handle_cast({:input, id, input}, state) do
-    if state.status == "playing" and Enum.any?(state.members, &(&1.id == id)) do
+    if state.status == "playing" and Enum.any?(state.members, &(&1.id == id)) and
+         (is_nil(Map.get(input, :round_id)) or input.round_id == state.game.round_id) do
       {_, _, pending} = Map.get(state.inputs, id, {input, 0, %{shoot: false, reload: false}})
-      pending = %{shoot: pending.shoot or input.shoot, reload: pending.reload or input.reload}
+
+      pending = %{
+        shoot: pending.shoot or input.shoot,
+        reload: pending.reload or input.reload,
+        shot_input: if(input.shoot, do: input, else: Map.get(pending, :shot_input))
+      }
 
       {:noreply,
        %{
@@ -101,11 +107,21 @@ defmodule Arena.Lobby do
       Map.new(state.inputs, fn {id, {input, at, pending}} ->
         {id,
          if(now - at < 250,
-           do: %{
+           do:
              input
-             | shoot: input.shoot or pending.shoot,
+             |> Map.merge(
+               Map.take(Map.get(pending, :shot_input) || %{}, [
+                 :aim,
+                 :shot_aim,
+                 :aim_point,
+                 :shot_view,
+                 :effect_id
+               ])
+             )
+             |> Map.merge(%{
+               shoot: input.shoot or pending.shoot,
                reload: input.reload or pending.reload
-           },
+             }),
            else: %{x: 0, y: 0, aim: input.aim, shoot: false, reload: false}
          )}
       end)
@@ -119,7 +135,7 @@ defmodule Arena.Lobby do
       end)
 
     state = %{state | game: game, status: game.status, inputs: cleared_inputs}
-    Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, game})
+    Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, %{game | history: []}})
     if changed, do: broadcast_lobby(state)
 
     if game.status == "playing" do
@@ -221,7 +237,13 @@ defmodule Arena.Lobby do
     if Enum.any?(state.game.players, &(&1.id == id and &1.hp > 0 and not &1.bot)) do
       game = Arena.Game.set_order(state.game, order, id)
       state = %{state | game: game}
-      Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, game})
+
+      Phoenix.PubSub.broadcast(
+        Arena.PubSub,
+        topic(state),
+        {:game_snapshot, %{game | history: []}}
+      )
+
       {{:ok, %{}}, state}
     else
       {{:error, "Only living operators can issue squad orders."}, state}
@@ -245,7 +267,7 @@ defmodule Arena.Lobby do
 
     state = %{state | game: game, status: "playing", inputs: %{}}
     broadcast_lobby(state)
-    Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, game})
+    Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:game_snapshot, %{game | history: []}})
     Process.send_after(self(), :tick, @tick_ms)
     {{:ok, %{}}, state}
   end

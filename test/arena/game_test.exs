@@ -137,6 +137,14 @@ defmodule Arena.GameTest do
     assert hd(Game.step(before_next, trigger).players).ammo == 18
   end
 
+  test "a reload pressed with the first shot is retained after the full magazine fires" do
+    game = base() |> wall_arena()
+    shot = Game.step(game, %{"user-0" => %{aim: -1.57, shoot: true, reload: true}})
+    assert hd(shot.players).ammo == 19
+    assert hd(shot.players).reload_ms == 1500
+    assert hd(Game.step(shot, %{"user-0" => %{shoot: true}}).players).ammo == 19
+  end
+
   test "bots need time to acquire a visible target and obey the weapon cooldown" do
     game =
       Game.new([hd(humans())], 7)
@@ -425,6 +433,104 @@ defmodule Arena.GameTest do
     assert Enum.at(game.players, 1).ammo == 20
     game = %{game | shots: []} |> set_enemy(0, %{x: 800.0, y: 400.0}) |> Game.step(%{})
     assert Enum.at(game.players, 1).threat == {420.0, 160.0}
+  end
+
+  defp compensated_scene do
+    past =
+      base()
+      |> wall_arena()
+      |> set_player(0, %{x: 80.0, y: 160.0})
+      |> set_enemy(0, %{x: 220.0, y: 160.0, reaction_delay: 10_000})
+      |> Arena.Game.LagCompensation.record()
+
+    current = past |> set_enemy(0, %{y: 205.0})
+
+    request = %{
+      round_id: current.round_id,
+      view_ms: 0,
+      seen_tick: 0,
+      rtt_ms: 60,
+      received_at: System.monotonic_time(:millisecond)
+    }
+
+    {current, request}
+  end
+
+  test "shared history hits the displayed target while damage and positions remain current" do
+    {game, view} = compensated_scene()
+    input = %{aim: 0.0, shoot: true, effect_id: 1, shot_view: view}
+    assert hd(Game.step(game, %{"user-0" => Map.delete(input, :shot_view)}).enemies).hp == 100
+    hit = Game.step(game, %{"user-0" => input})
+    assert hd(hit.enemies).hp == 66
+    assert hd(hit.enemies).y > 190
+    assert hd(hit.players).ammo == 19
+    repeated = Enum.reduce(1..5, hit, fn _, g -> Game.step(g, %{"user-0" => input}) end)
+    assert hd(repeated.players).ammo == 19
+    assert hd(repeated.enemies).hp == 66
+    assert Enum.any?(Game.public(hit, "user-0").shots, &(&1.local and &1.effect_id == 1))
+
+    assert Enum.any?(
+             Game.public(hit, "user-0").events,
+             &(&1.type == "shot" and &1.local and &1.effect_id == 1)
+           )
+
+    refute Enum.any?(Game.public(hit, "user-1").shots, & &1.local)
+  end
+
+  test "rewind preserves walls, shared visibility, current death and weapon rules" do
+    {game, view} = compensated_scene()
+
+    for changed <- [
+          set_player(game, 0, %{reload_ms: 500}),
+          set_player(game, 0, %{cooldown_ms: 150}),
+          set_player(game, 0, %{hp: 0})
+        ] do
+      assert hd(
+               Game.step(changed, %{"user-0" => %{aim: 0.0, shoot: true, shot_view: view}}).enemies
+             ).hp == 100
+    end
+
+    dead =
+      set_enemy(game, 0, %{hp: 0})
+      |> Game.step(%{"user-0" => %{aim: 0.0, shoot: true, shot_view: view}})
+
+    assert hd(dead.enemies).hp == 0
+
+    hidden =
+      update_in(game.history, fn frames ->
+        Enum.map(frames, &put_in(&1, [:enemies, "hostile-0", :visible], false))
+      end)
+
+    assert hd(Game.step(hidden, %{"user-0" => %{aim: 0.0, shoot: true, shot_view: view}}).enemies).hp ==
+             100
+
+    blocked = set_player(game, 0, %{x: 380.0})
+    result = Game.step(blocked, %{"user-0" => %{aim: :math.pi(), shoot: true, shot_view: view}})
+    assert hd(result.enemies).hp == 100
+    assert hd(result.shots).x2 == 352.0
+  end
+
+  test "stale commands and previous rounds cannot rewind; shooter origin remains authoritative" do
+    {game, view} = compensated_scene()
+
+    for changes <- [
+          %{round_id: -1},
+          %{received_at: System.monotonic_time(:millisecond) - 300},
+          %{seen_tick: 999}
+        ] do
+      input = %{aim: 0.0, shoot: true, shot_view: Map.merge(view, changes)}
+      assert hd(Game.step(game, %{"user-0" => input}).enemies).hp == 100
+    end
+
+    moved = set_player(game, 0, %{y: 170.0})
+
+    result =
+      Game.step(moved, %{
+        "user-0" => %{aim: 0.0, aim_point: {220.0, 160.0}, shoot: true, shot_view: view}
+      })
+
+    assert hd(result.enemies).hp == 66
+    assert hd(result.shots).y1 == 170.0
   end
 
   defp flood(_map, [], seen), do: seen

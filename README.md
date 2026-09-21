@@ -28,7 +28,7 @@ For another machine on your LAN, use the host machine's LAN address and port 400
 
 Each mission grows a connected, irregular 8–12-room house, office or workshop with an exterior staging area and marked entry. All walls remain solid; destructible terrain is not included.
 
-Server events trigger procedurally generated client audio, with stereo positioning and distance attenuation.
+Your movement and gun feedback respond locally. Shared server history compensates hitscan timing against displayed targets; damage stays consistent across the squad. Audio is generated locally, with stereo positioning and distance attenuation.
 
 Living operators share current line of sight. The blueprint remains visible as a navigation aid; unexplored and out-of-sight areas are dimmed. For living operators, hostiles are only transmitted while visible. When you die, you become a spectator with full visibility of all actors until the next round. Walls block movement, vision, and hitscan shots. There is no friendly fire. Clear every hostile to win; losing all four operators ends the mission. The leader can then return to staging for a newly generated map. Bots have reaction delays and imperfect aim; enemies only pursue seen or heard threats, with expiring memory.
 
@@ -43,11 +43,13 @@ mix format --check-formatted
 node scripts/smoke.mjs
 node --test scripts/*.test.mjs
 ARENA_PROTOCOL=3 node scripts/network_probe.mjs
+# Controlled input/frame delays against a local server:
+ARENA_URL=http://localhost:4000 node scripts/responsiveness_probe.mjs
 ```
 
 See [architecture and design sources](docs/architecture.md) the [wire protocol](docs/protocol.md), and [measured network results](docs/network-measurements.md). The [movement prediction investigation](docs/movement-prediction.md) describes the enabled local forecasting and reconciliation.
 
-Deferred work, including hitscan lag compensation, is tracked in the [backlog](docs/backlog.md).
+See the [hitscan design and Valve review](docs/lag-compensation.md) and [remaining playtest work](docs/backlog.md).
 
 ## Deployment notes and limits
 

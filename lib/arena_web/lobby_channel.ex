@@ -18,12 +18,14 @@ defmodule ArenaWeb.LobbyChannel do
 
       socket =
         socket
+        |> assign(:shot_command, nil)
         |> assign(:lobby_pid, pid)
         |> assign(:protocol, if(payload["protocol"] in [2, 3], do: payload["protocol"], else: 1))
         |> assign(:snapshot_seed, reply.game && reply.game.seed)
         |> assign(:snapshot_tick, reply.game && reply.game.tick)
         |> assign(:stream, %{
           seq: 0,
+          rtts: [],
           last_sent: nil,
           inflight: [],
           pending: nil,
@@ -48,10 +50,20 @@ defmodule ArenaWeb.LobbyChannel do
       x: number(payload["x"], -1, 1),
       y: number(payload["y"], -1, 1),
       aim: number(payload["aim"], -1000, 1000),
+      shot_aim:
+        if(is_number(payload["shot_aim"]),
+          do: number(payload["shot_aim"], -1000, 1000),
+          else: nil
+        ),
       shoot: payload["shoot"] == true,
-      reload: payload["reload"] == true
+      reload: payload["reload"] == true,
+      round_id: payload["round_id"],
+      effect_id: effect_id(payload["effect_id"]),
+      aim_point: point(payload["aim_point"]),
+      shot_view: shot_timing(socket, payload)
     }
 
+    {input, socket} = preserve_shot(input, socket)
     Arena.Lobby.input(socket.assigns.lobby_pid, socket.assigns.user_id, input)
     {:noreply, socket}
   end
@@ -64,7 +76,9 @@ defmodule ArenaWeb.LobbyChannel do
     if Enum.any?(stream.inflight, &(&1.seq === seq)) do
       {acked, outstanding} = Enum.split_while(stream.inflight, &(&1.seq <= seq))
       Enum.each(acked, &Process.cancel_timer(&1.timer))
-      stream = %{stream | inflight: outstanding}
+      now = System.monotonic_time(:millisecond)
+      sample = now - List.last(acked).sent_at
+      stream = %{stream | inflight: outstanding, rtts: Enum.take([sample | stream.rtts], 32)}
       {:noreply, schedule_frame(assign(socket, :stream, stream))}
     else
       {:noreply, socket}
@@ -175,7 +189,7 @@ defmodule ArenaWeb.LobbyChannel do
         frame = ArenaWeb.SnapshotDelta.encode(snapshot, baseline, seq, base_seq)
         push(socket, "frame", frame)
         timer = Process.send_after(self(), {:frame_timeout, seq}, @ack_timeout)
-        inflight = stream.inflight ++ [%{seq: seq, timer: timer}]
+        inflight = stream.inflight ++ [%{seq: seq, timer: timer, sent_at: now}]
 
         assign(socket, :stream, %{
           stream
@@ -191,8 +205,59 @@ defmodule ArenaWeb.LobbyChannel do
   defp clear_stream(stream) do
     Enum.each(stream.inflight, &Process.cancel_timer(&1.timer))
     if stream.flush, do: Process.cancel_timer(elem(stream.flush, 1))
-    %{stream | last_sent: nil, inflight: [], pending: nil, latest: nil, flush: nil}
+
+    %{
+      stream
+      | last_sent: nil,
+        inflight: [],
+        pending: nil,
+        latest: nil,
+        flush: nil
+    }
   end
+
+  defp preserve_shot(%{effect_id: nil} = input, socket), do: {input, socket}
+
+  defp preserve_shot(input, socket) do
+    case socket.assigns.shot_command do
+      %{effect_id: id, round_id: round} = previous
+      when id == input.effect_id and round == input.round_id ->
+        {Map.merge(input, Map.take(previous, [:shot_aim, :aim_point, :shot_view])), socket}
+
+      _ ->
+        {input, assign(socket, :shot_command, input)}
+    end
+  end
+
+  defp shot_timing(socket, %{"view_ms" => time, "seen_tick" => seen, "round_id" => round})
+       when is_number(time) and time >= 0 and is_integer(seen) and seen >= 0 do
+    case socket.assigns.stream.last_sent do
+      {_, %{round_id: ^round, tick: tick}} when seen <= tick ->
+        samples = socket.assigns.stream.rtts
+        rtt = if samples == [], do: 0, else: Enum.min(samples)
+
+        %{
+          round_id: round,
+          view_ms: time,
+          seen_tick: seen,
+          rtt_ms: rtt,
+          received_at: System.monotonic_time(:millisecond)
+        }
+
+      _ ->
+        nil
+    end
+  end
+
+  defp shot_timing(_, _), do: nil
+
+  defp point(%{"x" => x, "y" => y})
+       when is_number(x) and is_number(y) and abs(x) <= 100_000 and abs(y) <= 100_000, do: {x, y}
+
+  defp point(_), do: nil
+
+  defp effect_id(v) when is_integer(v) and v > 0 and v <= 2_147_483_647, do: v
+  defp effect_id(_), do: nil
 
   defp number(v, lo, hi) when is_number(v), do: v |> max(lo) |> min(hi)
   defp number(_, _, _), do: 0

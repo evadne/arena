@@ -84,6 +84,7 @@ defmodule Arena.Game do
       seed: seed,
       round_id: System.unique_integer([:positive, :monotonic]),
       controls: %{},
+      history: [],
       status: "playing",
       tick: 0,
       elapsed_ms: 0,
@@ -101,6 +102,7 @@ defmodule Arena.Game do
       explored_tiles: MapSet.new()
     }
     |> update_vision()
+    |> Arena.Game.LagCompensation.record()
   end
 
   defp actor(id, x, y),
@@ -111,6 +113,7 @@ defmodule Arena.Game do
       angle: 0.0,
       hp: 100,
       ammo: 20,
+      last_effect_id: 0,
       reload_ms: 0,
       cooldown_ms: 0,
       path: [],
@@ -201,7 +204,7 @@ defmodule Arena.Game do
             %{player | x: px, y: py, angle: normalize(aim)}
             |> maybe_reload(get(input, :reload, false) == true)
 
-          {player, Map.put(actions, player.id, get(input, :shoot, false) == true)}
+          {player, Map.put(actions, player.id, input)}
         end
       end)
 
@@ -210,7 +213,8 @@ defmodule Arena.Game do
 
     game =
       Enum.reduce(players, game, fn p, state ->
-        if Map.get(actions, p.id, false), do: shoot(state, :players, p.id), else: state
+        input = Map.get(actions, p.id, %{})
+        if get(input, :shoot, false) == true, do: shoot(state, :players, p.id, input), else: state
       end)
 
     game =
@@ -241,7 +245,7 @@ defmodule Arena.Game do
           sound(game, "round_end", {512, 352}, if(status == "won", do: "friendly", else: "enemy")),
         else: game
 
-    update_vision(game)
+    game |> update_vision() |> Arena.Game.LagCompensation.record()
   end
 
   defp timers(actor, dt) do
@@ -262,10 +266,15 @@ defmodule Arena.Game do
       else: p
   end
 
-  defp shoot(game, side, id) do
+  defp shoot(game, side, id, input \\ %{}) do
     source = Enum.find(Map.fetch!(game, side), &(&1.id == id))
 
+    effect_id = Map.get(input, :effect_id)
+
     cond do
+      is_integer(effect_id) and effect_id <= source.last_effect_id ->
+        game
+
       source.hp <= 0 or source.reload_ms > 0 or source.cooldown_ms > 0 ->
         game
 
@@ -276,6 +285,11 @@ defmodule Arena.Game do
         opposite = if side == :players, do: :enemies, else: :players
         a = pos(source)
 
+        candidates =
+          if side == :players,
+            do: Arena.Game.LagCompensation.targets(game, source, Map.get(input, :shot_view)),
+            else: game.players
+
         spread =
           if side == :enemies,
             do:
@@ -283,13 +297,23 @@ defmodule Arena.Game do
                 0.04,
             else: 0
 
-        angle = source.angle + spread
-        endpoint = {source.x + :math.cos(angle) * 1100, source.y + :math.sin(angle) * 1100}
+        angle =
+          case Map.get(input, :aim_point) do
+            {x, y} when side == :players and not source.bot ->
+              :math.atan2(y - source.y, x - source.x)
+
+            _ ->
+              Map.get(input, :shot_aim) || source.angle
+          end
+
+        angle = angle + spread
+        {ax, ay} = a
+        endpoint = {ax + :math.cos(angle) * 1100, ay + :math.sin(angle) * 1100}
         {wall_end, _} = World.ray(game.map, a, endpoint)
         wall_distance = distance(a, wall_end)
 
         target =
-          Map.fetch!(game, opposite)
+          candidates
           |> Enum.filter(&(&1.hp > 0))
           |> Enum.map(fn target -> {target, ray_circle(a, angle, pos(target), 11)} end)
           |> Enum.filter(fn {_t, d} -> is_number(d) and d < wall_distance end)
@@ -303,8 +327,10 @@ defmodule Arena.Game do
             {victim, d} ->
               damage = if side == :players, do: 34, else: 16
 
-              {replace(Map.fetch!(game, opposite), %{victim | hp: max(0, victim.hp - damage)}),
-               {source.x + :math.cos(angle) * d, source.y + :math.sin(angle) * d}}
+              current = Enum.find(Map.fetch!(game, opposite), &(&1.id == victim.id))
+
+              {replace(Map.fetch!(game, opposite), %{current | hp: max(0, current.hp - damage)}),
+               {ax + :math.cos(angle) * d, ay + :math.sin(angle) * d}}
           end
 
         cooldown =
@@ -316,15 +342,23 @@ defmodule Arena.Game do
             else: source.burst_left
 
         source =
-          %{source | ammo: source.ammo - 1, cooldown_ms: cooldown, burst_left: burst}
-          |> maybe_reload(false)
+          %{
+            source
+            | ammo: source.ammo - 1,
+              cooldown_ms: cooldown,
+              burst_left: burst,
+              last_effect_id: effect_id || source.last_effect_id
+          }
+          |> maybe_reload(get(input, :reload, false) == true)
 
         {fx, fy} = finish
 
         shot = %{
           id: game.shot_seq + 1,
-          x1: source.x,
-          y1: source.y,
+          x1: ax,
+          y1: ay,
+          actor_id: source.id,
+          effect_id: effect_id,
           x2: fx,
           y2: fy,
           team: if(side == :players, do: "friendly", else: "enemy"),
@@ -336,7 +370,7 @@ defmodule Arena.Game do
         |> Map.update!(side, &replace(&1, source))
         |> Map.put(:shot_seq, shot.id)
         |> Map.update!(:shots, &[shot | &1])
-        |> sound("shot", a, shot.team)
+        |> sound("shot", a, shot.team, %{actor_id: source.id, effect_id: effect_id})
     end
   end
 
@@ -672,7 +706,19 @@ defmodule Arena.Game do
       players:
         Enum.map(
           game.players,
-          &Map.take(&1, [:id, :name, :slot, :x, :y, :angle, :hp, :ammo, :reload_ms, :bot])
+          &Map.take(&1, [
+            :id,
+            :name,
+            :slot,
+            :x,
+            :y,
+            :angle,
+            :hp,
+            :ammo,
+            :reload_ms,
+            :bot,
+            :last_effect_id
+          ])
         ),
       enemies:
         game.enemies
@@ -683,15 +729,23 @@ defmodule Arena.Game do
       shots:
         game.shots
         |> Enum.filter(&(spectator or &1.team == "friendly" or team_sees?(game, {&1.x1, &1.y1})))
-        |> Enum.map(&Map.drop(&1, [:at])),
+        |> Enum.map(
+          &(Map.drop(&1, [:at, :actor_id])
+            |> Map.put(:local, Map.get(&1, :actor_id) == user_id))
+        ),
       events: audible_events(game, listener, spectator),
       visible_tiles: Enum.map(visible_tiles, fn {x, y} -> [x, y] end),
       explored_tiles: Enum.map(explored_tiles, fn {x, y} -> [x, y] end)
     }
   end
 
-  defp sound(game, type, {x, y}, team) do
-    event = %{id: game.event_seq + 1, type: type, x: x, y: y, team: team, at: game.elapsed_ms}
+  defp sound(game, type, {x, y}, team, metadata \\ %{}) do
+    event =
+      Map.merge(
+        %{id: game.event_seq + 1, type: type, x: x, y: y, team: team, at: game.elapsed_ms},
+        metadata
+      )
+
     %{game | event_seq: event.id, events: [event | game.events]}
   end
 
@@ -738,7 +792,8 @@ defmodule Arena.Game do
             volume = if occluded and not spectator, do: volume * 0.45, else: volume
 
             [
-              Map.drop(event, [:at])
+              Map.drop(event, [:at, :actor_id])
+              |> Map.put(:local, listener != nil and Map.get(event, :actor_id) == listener.id)
               |> Map.merge(%{volume: volume, occluded: occluded and not spectator})
             ]
           else

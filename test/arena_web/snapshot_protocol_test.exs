@@ -279,6 +279,63 @@ defmodule ArenaWeb.SnapshotProtocolTest do
     refute Enum.any?(revealed, &Map.has_key?(&1, :memory))
   end
 
+  test "shot timing uses ACK latency and keeps the original trigger through keepalive and release" do
+    {socket, reply, pid} = join(3)
+    past = Arena.Game.new(reply.lobby.members, 7)
+    player = hd(past.players)
+    [enemy | others] = past.enemies
+    enemy = %{enemy | x: player.x + 28, y: player.y, reaction_delay: 10_000}
+    past = %{past | enemies: [enemy | others]} |> Arena.Game.LagCompensation.record()
+    current = %{past | enemies: [%{enemy | y: enemy.y + 40} | others]}
+    :sys.replace_state(pid, &%{&1 | game: current, status: "playing"})
+    send(socket.channel_pid, {:game_snapshot, past})
+    assert %{seq: 1} = frame(socket)
+    push(socket, "frame_ack", %{"seq" => 1})
+    assert length(stream(socket).rtts) == 1
+
+    input = %{
+      "x" => 0,
+      "y" => 0,
+      "aim" => 0,
+      "shot_aim" => 0,
+      "aim_point" => %{"x" => enemy.x, "y" => enemy.y},
+      "shoot" => true,
+      "round_id" => past.round_id,
+      "effect_id" => 1,
+      "view_ms" => 0,
+      "seen_tick" => 0
+    }
+
+    push(socket, "input", input)
+    first = Phoenix.Channel.Server.socket(socket.channel_pid).assigns.shot_command
+    assert first.shot_view.rtt_ms >= 0
+    assert first.shot_view.seen_tick == 0
+    push(socket, "input", %{input | "shot_aim" => 2, "view_ms" => 9999})
+    assert Phoenix.Channel.Server.socket(socket.channel_pid).assigns.shot_command == first
+
+    push(socket, "input", %{
+      "x" => 0,
+      "y" => 0,
+      "aim" => 2,
+      "shoot" => false,
+      "round_id" => past.round_id
+    })
+
+    Phoenix.Channel.Server.socket(socket.channel_pid)
+    send(pid, :tick)
+    state = :sys.get_state(pid)
+    assert hd(state.game.enemies).hp == 66
+    assert hd(state.game.enemies).y > enemy.y + 20
+    assert hd(state.game.players).ammo == 19
+    assert hd(state.game.players).last_effect_id == 1
+    assert length(state.game.history) == 2
+    refute Map.has_key?(stream(socket), :history)
+    previous = state.inputs
+    push(socket, "input", %{input | "round_id" => -1, "effect_id" => 2})
+    Phoenix.Channel.Server.socket(socket.channel_pid)
+    assert :sys.get_state(pid).inputs == previous
+  end
+
   defp inflight_seqs(socket), do: Enum.map(stream(socket).inflight, & &1.seq)
 
   defp stream(socket), do: Phoenix.Channel.Server.socket(socket.channel_pid).assigns.stream

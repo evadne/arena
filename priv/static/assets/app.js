@@ -1,12 +1,14 @@
 import { Socket } from "./phoenix.mjs";
 import { SnapshotBuffer, mergeSnapshotMap, interpolateActor, aimAt } from "./snapshot_buffer.mjs";
 
+import { WeaponFeedback, tracerEnd } from "./weapon_feedback.mjs";
 import { MovementPrediction } from "./movement_prediction.mjs";
 import { FrameDecoder } from "./frame_decoder.mjs";
 import { inviteURL, inviteQRSvg } from "./invite_qr.mjs";
 
 const snapshots = new SnapshotBuffer();
 const prediction = new MovementPrediction();
+const weapon = new WeaponFeedback();
 const frames = new FrameDecoder();
 let frameResyncPending = false;
 
@@ -205,6 +207,7 @@ function disconnect(clearUrl = true) {
   frames.reset();
   frameResyncPending = false;
   clearPlayback();
+  prediction.setRTT(0);
   state.connected = false;
   state.joining = false;
   state.shots.clear();
@@ -538,7 +541,11 @@ function setHTML(element, value) {
 }
 function clearPlayback() {
   snapshots.clear();
+  const rtt = prediction.rtt;
   prediction.reset();
+  prediction.setRTT(rtt);
+  weapon.reset();
+  state.shotIntent = null;
   state.displayedLocal = null;
 }
 function receiveSnapshot(game) {
@@ -559,6 +566,7 @@ function receiveSnapshot(game) {
   state.game = game;
   const arrival = performance.now();
   snapshots.push(game, arrival);
+  weapon.accept(game, state.userId, arrival);
   prediction.accept(game, state.userId, arrival);
   const visible = new Set((game.visible_tiles || []).map(([x, y]) => `${x},${y}`));
   const explored = new Set((game.explored_tiles || []).map(([x, y]) => `${x},${y}`));
@@ -573,7 +581,7 @@ function receiveSnapshot(game) {
     color: visible.has(`${x},${y}`) ? "#c9dc8910" : explored.has(`${x},${y}`) ? "#070f0a55" : "#060c08aa",
   }));
   for (const shot of game.shots || [])
-    if (!state.shots.has(shot.id))
+    if (!state.shots.has(shot.id) && !weapon.echoed(shot))
       state.shots.set(shot.id, { ...shot, at: performance.now() });
   const me = game.players.find((p) => p.id === state.userId);
   if (me) {
@@ -611,7 +619,7 @@ function receiveSnapshot(game) {
   for (const event of game.events || []) {
     if (!state.audioEvents.has(event.id)) {
       state.audioEvents.add(event.id);
-      playEventSound(event, me, game);
+      if (!weapon.echoed(event)) playEventSound(event, me, game);
     }
   }
   if (state.audioEvents.size > 3000)
@@ -639,6 +647,7 @@ function releaseInput() {
     state.channel.push("input", {
       x: 0,
       y: 0,
+      round_id: state.game?.round_id,
       aim: state.aim,
       shoot: false,
       reload: false,
@@ -720,6 +729,25 @@ function movement() {
     y: Number(k.has(edsf ? "d" : "s")) - Number(k.has(edsf ? "e" : "w")),
   };
 }
+function emitWeaponFeedback(now) {
+  const id = weapon.fire(now, state.shoot, state.reload);
+  if (id === null || !state.displayedLocal) return false;
+  const origin = state.displayedLocal;
+  state.shotIntent = {effect_id: id, shot_aim: state.aim,
+    aim_point: state.mouse ? {...state.mouse} : null, ...shotView()};
+  const wall = rayEnd(origin.x, origin.y, state.aim, state.game.map, 1100);
+  const sample = snapshots.sample(now);
+  const targets = state.game.enemies.map((p) => interpolateActor(p, sample, "enemies"));
+  const end = tracerEnd(origin, state.aim, wall, targets);
+  state.shots.set(`local-${id}`, { x1: origin.x, y1: origin.y, x2: end.x, y2: end.y, team: "friendly", at: now });
+  playEventSound({type: "shot", x: origin.x, y: origin.y, team: "friendly", volume: 1}, origin, state.game);
+  return true;
+}
+function shotView() {
+  const sample = snapshots.sample(performance.now());
+  return sample ? {view_ms: sample.from.time + (sample.to.time - sample.from.time) * sample.t,
+    seen_tick: state.game.tick} : {};
+}
 function sendInput() {
   if (
     !state.connected ||
@@ -733,8 +761,11 @@ function sendInput() {
   prediction.input(movement(), performance.now());
   state.displayedLocal = prediction.sample(performance.now());
   updateAim();
+  emitWeaponFeedback(performance.now());
   state.channel.push("input", {
     ...movement(),
+    round_id: state.game.round_id,
+    ...state.shotIntent,
     aim: state.aim,
     shoot: state.shoot,
     reload: state.reload,
@@ -1082,6 +1113,7 @@ function render(now) {
       ? local : interpolateActor(p, sample, "players"));
     state.displayedLocal = players.find((p) => p.id === state.userId) || null;
     updateAim();
+    if (state.connected && document.hasFocus() && !inputFocused() && emitWeaponFeedback(now)) sendInput();
     for (const player of players) {
       const me = player.id === state.userId,
         angle = me ? state.aim : player.angle;

@@ -71,3 +71,5 @@ ARENA_URL=http://127.0.0.1:4107 PROBE_JITTER_MS=20 node scripts/responsiveness_p
 ```
 
 The changed build has not been deployed to Fly. Production baseline measurements and local change verification must not be conflated.
+
+Final local verification: 60 ExUnit tests and 35 client tests pass, plus formatting, warnings-as-errors compilation, JavaScript syntax and the full live WebSocket smoke suite. Browser checks exercised launch, movement input, firing, reload and reconnect with no console warnings/errors. A quick fire/reload browser check exposed a same-tick reload loss; the corrected implementation retains it and has a regression test. The final shared-history build still delivered 157 frames / 156 ticks over eight seconds, with 51.0 ms median arrival, 53.3 ms maximum gap and 0.3 ms median RTT.

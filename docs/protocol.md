@@ -6,7 +6,8 @@ Connect a Phoenix socket at `/socket` and join `lobby:CODE`, where the code is 4
 
 | Event | Payload | Access |
 | --- | --- | --- |
-| `input` | `{x, y, aim, shoot, reload}` | Living operator during play; no reply |
+| `input` | `{x, y, aim, shoot, reload, round_id, effect_id, shot_aim, aim_point, view_ms, seen_tick}` | Living operator during play; no reply |
+| `ping` | `{}` | Connection RTT probe; replies `ok` |
 | `chat` | `{text}` | Connected member outside active play |
 | `start` | `{}` | Leader in staging |
 | `transfer` | `{user_id}` | Leader; recipient must be connected |
@@ -45,7 +46,7 @@ Empty fields are omitted. `players` and `enemies` have sparse `upsert` records a
 
 After reconstructing a frame, send `frame_ack` with `{seq}` (no reply). Acknowledgements are cumulative and valid only for actually outstanding frame numbers. The server permits at most four unacknowledged frames per Channel, with a 50 ms minimum send interval. This small pipeline sustains 20 updates/second through ordinary round-trip delay instead of stopping after every frame to wait for a reply. When the window is full, incoming ticks replace a single pending state before visibility filtering or JSON encoding. An acknowledgement frees space for the newest pending state; old pending ticks are not queued. Very slow clients still adapt down, and memory/transport backlog remain bounded.
 
-Deltas form a chain against the last sent baseline; `frame_ack` controls the send window, not which snapshot supplies the next delta baseline. A missing baseline still triggers a full resync. Rendering uses bounded interpolation buffers: 50 ms for the living local player and 100 ms for remote actors. Position rendering clamps to the newest known state and never extrapolates through walls. Movement direction changes are sent immediately, in addition to 30 Hz held-input refreshes. There is no client movement prediction or lag-compensated shooting yet.
+Deltas form a chain against the last sent baseline; `frame_ack` controls the send window, not which snapshot supplies the next delta baseline. A missing baseline still triggers a full resync. Remote actors use a 100 ms interpolation buffer that clamps to the newest state. The local player forecasts against the shared collision geometry, with a latency-dependent horizon capped at 400 ms and bounded visual correction. Movement direction changes are sent immediately, in addition to 30 Hz held-input refreshes. The local player uses bounded movement forecasting and reconciliation; human hitscan uses shared server history.
 
 A missing/wrong baseline triggers `frame_resync` with `{}` (no reply): the next frame is full. Resync requests are limited to once per second. Frame numbers stay monotonic across rounds within a Channel; old acknowledgements/timers are ignored. A client that fails to acknowledge for 15 seconds loses its Channel; Phoenix rejoins automatically with fresh state. Other players and the simulation continue independently. A new socket identity can only reclaim an available bot slot. As with all departures, an empty lobby closes.
 
@@ -57,22 +58,30 @@ Join replies retain a full `game` for immediate late-join display; the first str
 
 ```text
 {
-  seed, status, tick, elapsed_ms, spectator, order,
+  seed, round_id, status, tick, elapsed_ms, spectator, order, control: {x,y},
   map: {width, height, tile_size, archetype, entry: {x,y,label},
         floor_tiles: [[column,row]], exterior_tiles: [[column,row]], walls: [{x,y,w,h}],
         rooms: [{x,y,w,h,label}], spawn: {x,y}},
-  players: [{id,name,slot,x,y,angle,hp,ammo,reload_ms,bot}],
+  players: [{id,name,slot,x,y,angle,hp,ammo,reload_ms,bot,last_effect_id}],
   enemies: [{id,x,y,angle,hp,state}], enemies_remaining, enemies_total,
-  shots: [{id,x1,y1,x2,y2,team}],
-  events: [{id,type,x,y,team,volume,occluded}],
+  shots: [{id,x1,y1,x2,y2,team,local,effect_id}],
+  events: [{id,type,x,y,team,volume,occluded,local,effect_id}],
   visible_tiles: [[column,row]], explored_tiles: [[column,row]]
 }
 ```
 
 Coordinates are world pixels. Maps are 1408×1024, with 32-pixel tiles. Four operators and 12–20 enemies spawn each round. Each connected floorplan contains 8–12 rooms, an irregular perimeter and an external staging area. For living viewers, enemy actors and hostile shot origins are filtered by shared squad vision. The blueprint remains available for navigation. A dead human gets `spectator: true`, all actors, all map tiles and all shots until the next round.
 
-Sound event types are `shot`, `reload`, `hit`, `death` and `round_end`. Event IDs remain stable over their 200 ms retention period; clients deduplicate them. The server filters audible events by the viewer's position and supplies distance gain and wall occlusion. Nearby unseen gunfire is an intentional sound cue, not visual knowledge. Spectators receive the full sound field. Clients synthesize and spatially pan the audio; they never invent combat events from unconfirmed input.
+Sound event types are `shot`, `reload`, `hit`, `death` and `round_end`. Event IDs remain stable over their 200 ms retention period; clients deduplicate them. The server filters audible events by the viewer's position and supplies distance gain and wall occlusion. Nearby unseen gunfire is an intentional sound cue, not visual knowledge. Spectators receive the full sound field. Clients synthesize and spatially pan the audio. Their own gun sound and tracer play immediately; matching `local`/`effect_id` echoes are suppressed. Damage, hits, death and reload outcomes remain authoritative.
 
 ## Engine API
 
-`Arena.Game.new(members, seed, formation \\ "stack")`, `step(game, inputs, dt_ms \\ 50)`, `public(game, user_id \\ nil)` , `disconnect(game, user_id)` and `set_order(game, order, requester_id)`. Inputs map user IDs to atom-keyed intent maps. Internal simulation state stays in the lobby process; PubSub relays it internally to Channels, which sanitize each snapshot for its recipient before JSON serialization.
+`Arena.Game.new(members, seed, formation \\ "stack")`, `step(game, inputs, dt_ms \\ 50)`, `public(game, user_id \\ nil)` , `disconnect(game, user_id)` and `set_order(game, order, requester_id)`. Inputs map user IDs to atom-keyed intent maps. Internal simulation state stays in the lobby process; PubSub relays current state without the shared history internally to Channels, which sanitize each snapshot for its recipient before JSON serialization.
+
+## Predicted controls and compensated shots
+
+`round_id` identifies a simulation round independently of the map seed. The personalized `control` field contains the movement direction actually consumed in the snapshot tick; it acknowledges no duration or packet count. Stale-round input is ignored. Legacy inputs without the new metadata remain supported.
+
+Each predicted shot has a positive increasing `effect_id` (at most 2,147,483,647), a captured `shot_aim` angle and optional `{x,y}` world cursor `aim_point`, `view_ms` (rendered simulation time) and `seen_tick` (latest received snapshot tick). No client origin or hit/target claim is accepted. Metadata freezes on the first submission of that ID, survives trigger release and cannot produce more than one shot. Subsequent IDs still obey server cooldown/ammunition/reload.
+
+ACKs also measure connection RTT using the outstanding frame's server send time. The Channel validates shot tick/round metadata; the shared game history validates rewind time against RTT plus the fixed 100 ms remote interpolation and queue time, with a one-second cap and a 200 ms discrepancy fallback. Human reaction time adds no allowance. History contains one common set of enemy transforms and shared visibility per simulation tick. It is neither duplicated per connection nor exposed in frames. See [the full compensation rules](lag-compensation.md).
