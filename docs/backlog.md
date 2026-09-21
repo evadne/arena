@@ -7,7 +7,7 @@ Execute in this order; keep the README aligned with the shipped behaviour.
 - [x] Audit README claims; replace the movement preset selector with a keybindings dialog saved to Local Storage.
 - [x] Audit confusing UI labels, states and actions; make the next step clear for hosts, guests and reconnecting players.
 - [x] Show reloading operators with a visible circular indicator.
-- [ ] Remove standby fireteam and inactive chat from the initial page.
+- [x] Remove standby fireteam and inactive chat from the initial page.
 - [ ] Generate a fresh landing-page map on the backend for every load; display a very slowly rotating angled 3D preview.
 - [ ] Integrate a vertical fireteam list above Deploy Squad in the lobby.
 - [ ] Place chat below the fireteam list and deployment controls.

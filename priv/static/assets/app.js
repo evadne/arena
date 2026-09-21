@@ -400,6 +400,7 @@ function rosterName(slot, member, player) {
 function renderRoster() {
   const roster = $("roster");
   roster.replaceChildren();
+  if (!state.lobby) return;
   const members = state.lobby?.members || [];
   for (let slot = 0; slot < 4; slot++) {
     const member = members.find((m) => m.slot === slot),
@@ -517,6 +518,8 @@ function updateUI() {
   }
   state.uiPhase = status;
   $("entry-panel").hidden = joined;
+  $("squad-panel").hidden = !joined;
+  $("comms-panel").hidden = !joined || playing;
   $("session-panel").hidden = !joined;
   $("session-code").textContent = state.lobby?.code || "—";
   $("lobby-state").textContent = joined
