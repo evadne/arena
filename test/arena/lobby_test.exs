@@ -23,6 +23,17 @@ defmodule Arena.LobbyTest do
         end
       end)
 
+  test "blank callsigns do not occupy slots and valid names are trimmed" do
+    p = lobby()
+
+    for name <- [nil, "", " \t\n", "\0", 42] do
+      assert {:error, "Enter your callsign."} = Arena.Lobby.join(p, "a", name, self())
+    end
+
+    assert {:ok, %{lobby: %{members: [%{name: "Echo", slot: 0}]}}} =
+             Arena.Lobby.join(p, "a", "  Echo  ", self())
+  end
+
   test "first member leads and manual leadership transfer is unavailable" do
     p = lobby()
     assert {:ok, %{lobby: %{leader_id: "a"}}} = Arena.Lobby.join(p, "a", "Alpha", self())

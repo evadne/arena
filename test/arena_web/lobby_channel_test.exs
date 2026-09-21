@@ -20,6 +20,15 @@ defmodule ArenaWeb.LobbyChannelTest do
     %{socket: socket, code: code}
   end
 
+  test "missing or blank callsigns cannot create a lobby", %{socket: socket, code: code} do
+    for payload <- [%{}, %{"name" => ""}, %{"name" => " \t\n"}, %{"name" => nil}, %{"name" => 42}] do
+      assert {:error, %{reason: "Enter your callsign."}} =
+               subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:#{code}", payload)
+
+      assert Registry.lookup(Arena.Registry, code) == []
+    end
+  end
+
   test "join assigns server identity and pushes text chat", %{socket: socket, code: code} do
     {:ok, reply, socket} =
       subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:#{code}", %{"name" => "Echo"})
@@ -33,8 +42,12 @@ defmodule ArenaWeb.LobbyChannelTest do
   end
 
   test "invalid room and unauthorized events return errors", %{socket: socket, code: code} do
-    assert {:error, _} = subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:bad!", %{})
-    {:ok, _, socket} = subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:#{code}", %{})
+    assert {:error, _} =
+             subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:bad!", %{"name" => "Echo"})
+
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ArenaWeb.LobbyChannel, "lobby:#{code}", %{"name" => "Echo"})
+
     ref = push(socket, "teleport", %{"x" => 200})
     assert_reply(ref, :error)
     ref = push(socket, "slot", %{"slot" => 900})

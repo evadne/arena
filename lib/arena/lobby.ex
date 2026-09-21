@@ -31,7 +31,12 @@ defmodule Arena.Lobby do
   def handle_call(:state, _from, state), do: {:reply, public(state), state}
 
   def handle_call({:join, id, name, owner}, _from, state) do
+    name = clean_name(name)
+
     cond do
+      name == "" ->
+        {:reply, {:error, "Enter your callsign."}, state}
+
       Enum.any?(state.members, &(&1.id == id)) ->
         {:reply, {:error, "Already connected to this lobby."}, state}
 
@@ -40,7 +45,7 @@ defmodule Arena.Lobby do
 
       true ->
         slot = Enum.find(0..3, fn n -> not Enum.any?(state.members, &(&1.slot == n)) end)
-        member = %{id: id, name: clean_name(name), slot: slot}
+        member = %{id: id, name: name, slot: slot}
         ref = Process.monitor(owner)
 
         game =
@@ -290,15 +295,19 @@ defmodule Arena.Lobby do
   defp broadcast_lobby(state),
     do: Phoenix.PubSub.broadcast(Arena.PubSub, topic(state), {:lobby, public(state)})
 
-  defp clean_name(name) when is_binary(name) do
-    case name
-         |> String.replace(~r/[\x00-\x1F\x7F]/u, "")
-         |> String.trim()
-         |> String.slice(0, 20) do
-      "" -> "Operator"
-      value -> value
+  def validate_name(name) do
+    case clean_name(name) do
+      "" -> {:error, "Enter your callsign."}
+      value -> {:ok, value}
     end
   end
 
-  defp clean_name(_), do: "Operator"
+  defp clean_name(name) when is_binary(name) do
+    name
+    |> String.replace(~r/[\x00-\x1F\x7F]/u, "")
+    |> String.trim()
+    |> String.slice(0, 20)
+  end
+
+  defp clean_name(_), do: ""
 end

@@ -13,7 +13,7 @@ mix deps.get
 mix phx.server
 ```
 
-Open **http://localhost:4000**. Enter a callsign and choose **Create lobby**, or use **Join lobby** with an invite code. The lobby lists squad members in join order above **Deploy Squad**; AI fills the remaining slots and chat sits below deployment. Share the invite link or lobby code with teammates, or have them scan the QR code. An invitation makes joining the primary action. A keyboard and mouse are needed to play. QR codes are generated locally and disappear during gameplay. The first connected player leads and can deploy solo or with friends; AI fills the remaining slots in the four-person squad. Guests see who will deploy. Slots are assigned automatically.
+Open **http://localhost:4000**. Enter a required callsign and choose **Create lobby**, or open an invite link and choose **Join lobby**. Your callsign is saved in Local Storage for future visits. The lobby lists squad members in join order above **Deploy Squad**; AI fills the remaining slots and chat sits below deployment. Copy the invite link from the lobby to share with teammates, or have them scan the QR code. An invitation makes joining the primary action. A keyboard and mouse are needed to play. QR codes are generated locally and disappear during gameplay. The first connected player leads and can deploy solo or with friends; AI fills the remaining slots in the four-person squad. Guests see who will deploy. Slots are assigned automatically.
 
 The landing page requests fresh facility geometry from the backend on every load and shows a slowly rotating 3D preview. Reduced-motion preferences stop the rotation. This is an independent preview; the shared mission map is generated when the leader deploys.
 

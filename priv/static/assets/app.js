@@ -57,18 +57,17 @@ function saveStorage(key, value) {
   } catch { return false; }
 }
 $("player-name").value = readStorage("breach-name", "");
-const incomingCode = new URL(location.href).searchParams.get("lobby");
-if (incomingCode) {
-  $("lobby-code").value = incomingCode
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 12);
-  $("entry-help").textContent = `Invite to lobby ${$("lobby-code").value}. Enter your callsign, then choose Join lobby.`;
-  $("entry-panel").append($("create-lobby"));
-  $("create-lobby").className = "secondary";
-  $("create-lobby").textContent = "CREATE A DIFFERENT LOBBY";
-  document.querySelector("#join-form button").className = "primary";
+let incomingCode = new URL(location.href).searchParams.get("lobby");
+function renderEntry() {
+  $("join-lobby").hidden = !incomingCode;
+  $("create-lobby").className = incomingCode ? "secondary" : "primary";
+  $("create-lobby").innerHTML = incomingCode ? "CREATE A DIFFERENT LOBBY" : "CREATE LOBBY <span>↗</span>";
+  $("entry-help").textContent = incomingCode
+    ? "Enter your callsign to join your squad."
+    : "Play solo with AI, or invite up to three friends.";
 }
+renderEntry();
+$("player-name").addEventListener("input", () => $("player-name").setCustomValidity(""));
 function notify(message, error = false) {
   clearTimeout(noticeTimer);
   $("notice").textContent = message;
@@ -96,13 +95,13 @@ function action(event, payload = {}, callback) {
 }
 function setConnection(connected, label) {
   state.connected = connected;
-  $("connection").hidden = !connected && !label;
+  $("connection").hidden = connected || !label;
   $("connection").classList.toggle("online", connected);
   $("connection").innerHTML = "";
   const dot = document.createElement("i");
   $("connection").append(
     dot,
-    document.createTextNode(label || (connected ? "CONNECTED" : "NOT IN A LOBBY")),
+    document.createTextNode(label || ""),
   );
   if (!connected) releaseInput();
   updateUI();
@@ -111,9 +110,13 @@ function join(code) {
   if (state.joining) return;
   code = code.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (!/^[A-Z0-9]{4,12}$/.test(code))
-    return notify("Use an operation code of 4–12 letters or numbers.", true);
-  let name = $("player-name").value.trim() || "Operator";
-  name = name.slice(0, 20);
+    return notify("This invite link is invalid. Ask your squad for a new link.", true);
+  const name = $("player-name").value.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 20);
+  if (!name) {
+    $("player-name").setCustomValidity("Enter your callsign.");
+    $("player-name").reportValidity();
+    return;
+  }
   saveStorage("breach-name", name);
   $("player-name").value = name;
   state.joining = true;
@@ -185,14 +188,9 @@ function join(code) {
       renderRoster();
       $("chat-log").replaceChildren();
       (reply.lobby.chat || []).forEach(addChat);
-      if (!(reply.lobby.chat || []).length)
-        addSystem("Squad chat is ready. Messages stay in this lobby.");
       const url = new URL(location.href);
       url.searchParams.set("lobby", reply.lobby.code);
       history.replaceState({}, "", url);
-      notify(
-        isLeader() ? "Lobby ready. Invite friends or deploy now with AI teammates." : "You joined the squad. The leader will deploy when ready.",
-      );
     })
     .receive("error", (reply) => {
       state.joining = false;
@@ -227,12 +225,9 @@ function disconnect(clearUrl = true) {
     const url = new URL(location.href);
     url.searchParams.delete("lobby");
     history.replaceState({}, "", url);
-    $("entry-help").before($("create-lobby"));
-    $("create-lobby").className = "primary";
-    $("create-lobby").innerHTML = "CREATE LOBBY <span>↗</span>";
-    document.querySelector("#join-form button").className = "secondary";
+    incomingCode = null;
+    renderEntry();
   }
-  $("entry-help").textContent = "Play solo with AI, or invite up to three friends.";
   $("chat-log").replaceChildren();
   const empty = document.createElement("div");
   empty.className = "chat-empty";
@@ -242,14 +237,12 @@ function disconnect(clearUrl = true) {
   setConnection(false);
   renderRoster();
 }
-$("create-lobby").addEventListener("click", () => {
+$("entry-panel").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (incomingCode && event.submitter?.id !== "create-lobby") return join(incomingCode);
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const random = crypto.getRandomValues(new Uint8Array(6));
   join(Array.from(random, (n) => alphabet[n % alphabet.length]).join(""));
-});
-$("join-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  join($("lobby-code").value);
 });
 $("leave-lobby").addEventListener("click", () => disconnect());
 async function copyInvite() {
@@ -257,7 +250,7 @@ async function copyInvite() {
     await navigator.clipboard.writeText(inviteURL(location.href, state.lobby.code));
     notify("Invite link copied. Send it to your squad.");
   } catch {
-    notify(`Invite code: ${state.lobby?.code}. Share this page’s address.`);
+    notify("Could not copy the invite. Copy this page’s address or share the QR code.", true);
   }
 }
 $("copy-invite").addEventListener("click", copyInvite);
@@ -360,12 +353,6 @@ $("chat-form").addEventListener("submit", (e) => {
       input.value = "";
     });
 });
-function addSystem(text) {
-  const line = document.createElement("div");
-  line.className = "chat-message system";
-  line.textContent = text;
-  $("chat-log").append(line);
-}
 function addChat(message) {
   const log = $("chat-log");
   const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 50;
@@ -430,7 +417,7 @@ function renderRoster() {
     detail.textContent = member
       ? state.lobby.leader_id === member.id
         ? "SQUAD LEADER"
-        : "PLAYER / READY"
+        : "PLAYER"
       : "AI TEAMMATE";
     if (player)
       detail.textContent =
@@ -466,13 +453,11 @@ function updateInviteQR() {
   document.body.classList.toggle("has-invite", !!url);
   if (!url) {
     image.removeAttribute("src");
-    $("invite-qr-code").textContent = "—";
     return;
   }
   try {
     image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(inviteQRSvg(url))}`;
-    image.alt = `Scan to join operation ${state.lobby.code}`;
-    $("invite-qr-code").textContent = state.lobby.code;
+    image.alt = "Scan to join the squad";
   } catch {
     // A very long/custom page URL must not prevent joining or copying an invite.
     panel.hidden = true;
@@ -514,17 +499,11 @@ function updateUI() {
   $("squad-panel").hidden = !joined;
   $("comms-panel").hidden = !joined || playing;
   $("session-panel").hidden = !joined;
-  $("session-code").textContent = state.lobby?.code || "—";
   document.querySelector(".helper").textContent = leader ? "AI fills empty slots. You can deploy solo." : "AI fills any slots left empty.";
-  $("lobby-state").textContent = joined
-    ? playing
-      ? "ACTIVE"
-      : over
-        ? "DEBRIEF"
-        : "CONNECTED"
-    : "STANDBY";
+  $("lobby-state").hidden = !joined || state.connected;
+  $("lobby-state").textContent = "DISCONNECTED";
   $("create-lobby").disabled = state.joining;
-  document.querySelector("#join-form button").disabled = state.joining;
+  $("join-lobby").disabled = state.joining;
   $("chat-input").disabled = !state.connected || playing;
   $("chat-input").placeholder = playing
     ? "Radio silence during operation"

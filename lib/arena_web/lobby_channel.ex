@@ -5,13 +5,14 @@ defmodule ArenaWeb.LobbyChannel do
   @ack_timeout 15_000
   @impl true
   def join("lobby:" <> code, payload, socket) do
-    with {:ok, pid} <- Arena.Lobbies.ensure(code),
+    with {:ok, name} <- Arena.Lobby.validate_name(payload["name"]),
+         {:ok, pid} <- Arena.Lobbies.ensure(code),
          :ok <- Phoenix.PubSub.subscribe(Arena.PubSub, "session:#{code}"),
          {:ok, reply} <-
            Arena.Lobby.join(
              pid,
              socket.assigns.user_id,
-             Map.get(payload, "name", "Operator"),
+             name,
              self()
            ) do
       Process.monitor(pid)

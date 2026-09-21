@@ -312,24 +312,9 @@ input:focus {
   line-height: 12px;
   font-weight: 400;
 }
-#create-lobby {
+#create-lobby, #join-lobby {
   width: 100%;
   margin-top: 10px;
-}
-.join-row {
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-  border-bottom: 1px solid #58714c66;
-  gap: 10px;
-}
-.join-row .primary { flex: none; padding: 12px; font-size: 9px; letter-spacing: 0.5px; }
-.join-row input {
-  border: 0;
-  background: transparent;
-  padding: 10px 0;
-  letter-spacing: 0.6px;
-  font-size: 10px;
 }
 .secondary {
   background: none;
@@ -347,24 +332,6 @@ input:focus {
   display: flex;
   align-items: center;
   gap: 22px;
-}
-.session-code {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.session-code > span {
-  font: 8px var(--mono);
-  color: #566e59;
-}
-.session-code strong {
-  font: 500 13px var(--mono);
-  letter-spacing: 2px;
-  color: #b4cf94;
-}
-.session-code .icon-button {
-  font-size: 8px;
-  color: #859d70;
 }
 .text-button {
   color: #536e59;
@@ -773,15 +740,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
 .operation-active #session-panel {
   gap: 15px;
 }
-.operation-active .session-code strong {
-  font-size: 10px;
-}
-.operation-active .session-code > span {
-  display: none;
-}
-.operation-active .session-code {
-  gap: 10px;
-}
 .operation-active .map-toolbar {
   display: flex;
   position: absolute;
@@ -974,9 +932,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   .volume-control {
     display: none;
   }
-  .session-code strong {
-    font-size: 11px;
-  }
 }
 @media (max-width: 760px) {
   body {
@@ -1101,9 +1056,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
     left: 7vw;
     gap: 20px;
   }
-  .session-code strong {
-    font-size: 12px;
-  }
   .deployment-bar {
     top: 408px;
     left: 7vw;
@@ -1168,13 +1120,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
     position: static;
     gap: 10px;
     margin-left: auto;
-  }
-  .operation-active .session-code {
-    gap: 7px;
-  }
-  .operation-active .session-code strong {
-    font-size: 8px;
-    letter-spacing: 1px;
   }
   .operation-active #copy-invite {
     display: none;
@@ -1429,16 +1374,6 @@ dialog p { font: 11px/1.7 var(--mono); color: #a1b795; }
   margin: 12px 0 8px;
   font: 8px/1.6 var(--mono);
   color: #91ab7c;
-}
-.invite-qr-code {
-  font: 8px var(--mono);
-  letter-spacing: 1px;
-  color: #627d56;
-}
-.invite-qr-code strong {
-  margin-left: 7px;
-  color: #c1d8a5;
-  font-weight: 500;
 }
 .operation-active .invite-qr {
   display: none;

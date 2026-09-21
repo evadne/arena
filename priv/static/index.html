@@ -24,16 +24,13 @@
           ><span class="brand-mark"><i></i><i></i><i></i></span>BREACH</a
         >
         <div id="session-panel" hidden>
-          <div class="session-code">
-            <span>LOBBY</span><strong id="session-code">—</strong
-            ><button
-              class="icon-button"
+          <button
+              class="header-button"
               id="copy-invite"
               title="Copy invitation link"
             >
               COPY INVITE
-            </button>
-          </div>
+          </button>
           <button class="text-button" id="leave-lobby">LEAVE LOBBY</button>
         </div>
         <div class="header-meta">
@@ -82,27 +79,20 @@
           </p>
         </div>
         <div class="operation-controls">
-          <div id="entry-panel">
-            <label for="player-name">YOUR CALLSIGN (OPTIONAL)</label
+          <form id="entry-panel">
+            <label for="player-name">YOUR CALLSIGN</label
             ><input
               id="player-name"
+              required
               maxlength="20"
               placeholder="YOUR CALLSIGN"
               autocomplete="nickname"
-            /><button class="primary" id="create-lobby">
+            /><button class="primary" id="join-lobby" type="submit" hidden>JOIN LOBBY <span>↗</span></button>
+            <button class="primary" id="create-lobby" type="submit">
               CREATE LOBBY <span>↗</span>
             </button>
             <p class="entry-help" id="entry-help">Play solo with AI, or invite up to three friends.</p>
-            <form id="join-form" class="join-row">
-              <input
-                id="lobby-code"
-                aria-label="Lobby code"
-                maxlength="12"
-                placeholder="ENTER INVITE CODE"
-                autocomplete="off"
-              /><button class="secondary" type="submit">JOIN LOBBY →</button>
-            </form>
-          </div>
+          </form>
         </div>
       </section>
 
@@ -115,7 +105,7 @@
       <section class="squad-panel" id="squad-panel" hidden>
         <div class="squad-heading">
           <h2>FIRETEAM <span id="squad-count">0 / 4</span></h2>
-          <span class="tiny-label" id="lobby-state">STANDBY</span>
+          <span class="tiny-label" id="lobby-state" role="status" hidden></span>
         </div>
         <div id="roster" class="roster" role="list" aria-label="Squad members"></div>
         <div class="squad-bottom">
@@ -141,9 +131,10 @@
         <div class="chat-log" id="chat-log" role="log" aria-live="polite">
           <div class="chat-empty">Connect to establish squad comms.</div>
         </div>
-        <form id="chat-form">
+        <form id="chat-form" autocomplete="off">
           <input
             id="chat-input"
+            autocomplete="off"
             placeholder="Message your squad…"
             maxlength="240"
             aria-label="Chat message"
@@ -156,8 +147,7 @@
         <h2 id="invite-qr-title">SCAN TO JOIN THE SQUAD</h2>
         <img id="invite-qr-image" width="260" height="260" alt="Operation invitation QR code" />
         <p>Share the link or scan to join this lobby.<br />A keyboard and mouse are needed to play.</p>
-        <button class="secondary" id="qr-copy-invite">COPY INVITE LINK</button>
-        <div class="invite-qr-code">OPERATION <strong id="invite-qr-code">—</strong></div>
+        <button class="header-button" id="qr-copy-invite">COPY INVITE LINK</button>
       </section>
       </div>
       <div class="map-toolbar">
