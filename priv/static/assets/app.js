@@ -1069,7 +1069,8 @@ function render(now) {
       room.y + 27,
     );
   }
-  // Team visibility is server-generated. Hidden enemies are absent from snapshots.
+  // Team visibility is server-generated. Hidden living enemies are absent from snapshots.
+  // Death markers are retained by the server and drawn above the fog.
   if (game) {
     for (const cell of state.fogCells) {
       ctx.fillStyle = cell.color;

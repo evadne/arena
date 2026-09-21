@@ -297,6 +297,29 @@ defmodule Arena.GameTest do
     assert Map.drop(after_player, [:bot]) == Map.drop(before, [:bot])
   end
 
+  test "death markers persist outside squad vision without revealing living enemies or fog" do
+    game =
+      base()
+      |> wall_arena()
+      |> set_player(1, %{hp: 0, x: 450.0, y: 160.0})
+      |> set_enemy(0, %{hp: 0, x: 420.0, y: 160.0})
+      |> Map.merge(%{visible_tiles: MapSet.new(), explored_tiles: MapSet.new()})
+
+    for tick <- [0, 100, 200] do
+      public = Game.public(%{game | tick: tick}, "user-0")
+      refute public.spectator
+      assert [%{id: "hostile-0", hp: 0, x: 420.0, y: 160.0}] = public.enemies
+      assert Enum.any?(public.players, &(&1.id == "user-1" and &1.hp == 0 and &1.x == 450.0))
+      assert public.visible_tiles == []
+      assert public.explored_tiles == []
+      assert public.enemies_remaining == length(game.enemies) - 1
+      refute Map.has_key?(hd(public.enemies), :memory)
+    end
+
+    fresh = Game.public(base(), "user-0")
+    refute Enum.any?(fresh.players ++ fresh.enemies, &(&1.hp <= 0))
+  end
+
   test "a dead human spectates all actors and the whole map without revealing them to survivors" do
     game =
       base()

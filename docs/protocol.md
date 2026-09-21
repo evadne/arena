@@ -47,7 +47,7 @@ Deltas form a chain against the last sent baseline; `frame_ack` controls the sen
 
 A missing/wrong baseline triggers `frame_resync` with `{}` (no reply): the next frame is full. Resync requests are limited to once per second. Frame numbers stay monotonic across rounds within a Channel; old acknowledgements/timers are ignored. A client that fails to acknowledge for 15 seconds loses its Channel; Phoenix rejoins automatically with fresh state. Other players and the simulation continue independently. A new socket identity can only reclaim an available bot slot. As with all departures, an empty lobby closes.
 
-Visibility filtering happens **before** delta comparison, independently for each viewer. Removal records hide actors that leave team sight. A dead player's transition to spectator adds the newly revealed actors and tiles. Private AI state never enters a frame.
+Visibility filtering happens **before** delta comparison, independently for each viewer. Removal records hide living enemies that leave team sight. Dead actors remain in the snapshot and delta baseline until the round is reset, regardless of team sight. A dead player's transition to spectator adds the newly revealed actors and tiles. Private AI state never enters a frame.
 
 Join replies retain a full `game` for immediate late-join display; the first streamed keyframe establishes the acknowledgement baseline. Protocol 2 omits the map after the first snapshot of a seed. Protocol 1 (including joins without a protocol) remains compatible with existing tabs by sending full snapshots. Refresh existing tabs to enable protocol 3.
 
@@ -67,7 +67,7 @@ Join replies retain a full `game` for immediate late-join display; the first str
 }
 ```
 
-Coordinates are world pixels. Maps are 1408×1024, with 32-pixel tiles. Four operators and 12–20 enemies spawn each round. Each connected floorplan contains 8–12 rooms, an irregular perimeter and an external staging area. For living viewers, enemy actors and hostile shot origins are filtered by shared squad vision. The blueprint remains available for navigation. A dead human gets `spectator: true`, all actors, all map tiles and all shots until the next round.
+Coordinates are world pixels. Maps are 1408×1024, with 32-pixel tiles. Four operators and 12–20 enemies spawn each round. Each connected floorplan contains 8–12 rooms, an irregular perimeter and an external staging area. For living viewers, living enemy actors and hostile shot origins are filtered by shared squad vision. Dead teammates and enemies are always included so their markers persist through fog for the rest of the round; this does not reveal surrounding tiles. The blueprint remains available for navigation. A dead human gets `spectator: true`, all actors, all map tiles and all shots until the next round.
 
 Sound event types are `shot`, `reload`, `hit`, `death` and `round_end`. Event IDs remain stable over their 200 ms retention period; clients deduplicate them. The server filters audible events by the viewer's position and supplies distance gain and wall occlusion. Nearby unseen gunfire is an intentional sound cue, not visual knowledge. Spectators receive the full sound field. Clients synthesize and spatially pan the audio. Their own gun sound and tracer play immediately; matching `local`/`effect_id` echoes are suppressed. Damage, hits, death and reload outcomes remain authoritative.
 

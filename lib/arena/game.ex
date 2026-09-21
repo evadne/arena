@@ -711,7 +711,7 @@ defmodule Arena.Game do
         ),
       enemies:
         game.enemies
-        |> Enum.filter(&(spectator or (&1.hp > 0 and team_sees?(game, pos(&1)))))
+        |> Enum.filter(&(spectator or &1.hp <= 0 or team_sees?(game, pos(&1))))
         |> Enum.map(&Map.take(&1, [:id, :x, :y, :angle, :hp, :state])),
       enemies_remaining: Enum.count(game.enemies, &(&1.hp > 0)),
       enemies_total: length(game.enemies),

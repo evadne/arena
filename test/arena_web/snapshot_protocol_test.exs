@@ -279,6 +279,39 @@ defmodule ArenaWeb.SnapshotProtocolTest do
     refute Enum.any?(revealed, &Map.has_key?(&1, :memory))
   end
 
+  test "death markers enter deltas outside vision and remain in the baseline" do
+    {socket, reply, _} = join(3)
+    game = Arena.Game.new(reply.lobby.members, 7)
+    player = hd(game.players)
+    [enemy | others] = game.enemies
+
+    cell =
+      Enum.max_by(game.map.floor, fn tile ->
+        {x, y} = Arena.Game.Map.center(tile)
+        (x - player.x) ** 2 + (y - player.y) ** 2
+      end)
+
+    {x, y} = Arena.Game.Map.center(cell)
+    enemy = %{enemy | x: x, y: y}
+    game = %{game | enemies: [enemy | others]}
+    send(socket.channel_pid, {:game_snapshot, game})
+    assert %{seq: 1, full: first} = frame(socket)
+    refute Enum.any?(first.enemies, &(&1.id == enemy.id))
+
+    dead = %{game | tick: 1, enemies: [%{enemy | hp: 0} | others]}
+    send(socket.channel_pid, {:game_snapshot, dead})
+    assert %{seq: 2, enemies: %{upsert: markers}} = frame(socket)
+    assert Enum.any?(markers, &(&1.id == enemy.id and &1.hp == 0 and &1.x == x and &1.y == y))
+
+    send(socket.channel_pid, {:game_snapshot, %{dead | tick: 2}})
+    assert %{seq: 3} = next = frame(socket)
+    refute enemy.id in (get_in(next, [:enemies, :remove]) || [])
+    {3, retained} = stream(socket).last_sent
+    assert Enum.any?(retained.enemies, &(&1.id == enemy.id and &1.hp == 0))
+    assert retained.visible_tiles == first.visible_tiles
+    refute retained.spectator
+  end
+
   test "shot timing uses ACK latency and keeps the original trigger through keepalive and release" do
     {socket, reply, pid} = join(3)
     past = Arena.Game.new(reply.lobby.members, 7)
