@@ -35,7 +35,7 @@ fly machine list --app evadne-arena
 curl --fail https://evadne-arena.fly.dev/health
 ```
 
-Confirm exactly one application Machine is running in `lhr`, with the configured two shared CPUs and 1 GB memory. Open [the application](https://evadne-arena.fly.dev) in two browser sessions, join the same lobby, and verify team membership, lobby chat, game start, movement, and a second round. A second distinct lobby should remain isolated. The `/health` check verifies HTTP availability; the two-session check verifies Phoenix WebSocket behavior.
+Confirm exactly one application Machine exists in `lhr` (running after traffic, stopped when idle), with the configured two shared CPUs and 1 GB memory. Open [the application](https://evadne-arena.fly.dev) in two browser sessions, join the same lobby, and verify team membership, lobby chat, game start, movement, and a second round. A second distinct lobby should remain isolated. The `/health` check verifies HTTP availability; the two-session check verifies Phoenix WebSocket behavior.
 
 ## Subsequent releases and operations
 
@@ -45,7 +45,7 @@ fly scale count 1 --region lhr --app evadne-arena
 fly logs --app evadne-arena
 ```
 
-Autostop is disabled, so idle lobbies keep their running server. The immediate deployment strategy intentionally replaces the single server without running a second lobby owner. Deployments, crashes, and restarts end all active in-memory lobbies and games. Plan updates between sessions; persistent recovery and horizontal scaling are outside this prototype's design.
+Autostop is enabled with `auto_stop_machines = "stop"`, `auto_start_machines = true` and `min_machines_running = 0`. Concurrency explicitly counts TCP connections, preserving the default soft limit of 20 with no hard limit. Open lobby WebSockets count as activity, including while players wait in the lobby. The application discards a lobby when its final human leaves; after all sockets close and proxy traffic becomes idle, Fly can stop the sole Machine on its periodic capacity check. This is traffic-based, not an immediate callback from the lobby registry. A later HTTP request wakes the Machine, with cold-start latency. See [Fly Proxy autostop/autostart](https://fly.io/docs/reference/fly-proxy-autostop-autostart/) and [concurrency settings](https://fly.io/docs/apps/concurrency/). The immediate deployment strategy intentionally replaces the single server without running a second lobby owner. Deployments, crashes, and restarts end all active in-memory lobbies and games. Plan updates between sessions; persistent recovery and horizontal scaling are outside this prototype's design.
 
 `SECRET_KEY_BASE` is the only required secret. `HOST`, `PORT=4000`, and disabled release distribution are ordinary environment settings in `fly.toml`. Fly terminates HTTPS and proxies HTTP/WebSockets to port 4000. No extra public Erlang ports are exposed. See [Fly configuration](https://fly.io/docs/reference/configuration/) and [secrets](https://fly.io/docs/apps/secrets/) for the platform settings.
 
